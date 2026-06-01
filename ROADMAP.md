@@ -69,7 +69,7 @@ nothing plays. Avatars unbound (`m_Avatar:0`); controller motions are dangling r
 - ✅ `AnimatorClipUtil` — auto-attaches the fallback when an Animator has no clips (no prefab edits); auto-off once clips exist
 - ✅ `PlayerAnimator`/`BotAnimator` route to the fallback; fixed `maxSpeedForNormalization` 8→6
 - ✅ `PlayerController.Knockback` now triggers the knockdown reaction (was dead code)
-- 🧑 Import an **animated** character pack (Quaternius Ultimate Animated — same `CharacterArmature` rig — or Mixamo) → upgrades from procedural to real skeletal anim `P0`
+- 🧑 **Drop-in upgrade to real skeletal anim:** download the CC0 [Quaternius Ultimate Animated Character Pack](https://quaternius.com/packs/ultimatedanimatedcharacter.html) (same `CharacterArmature` rig `CharacterAnimSetup` already expects — clips `CharacterArmature|Idle/Run/Jump/...`), replace `Assets/Art/Quaternius/Characters/BlueSoldier_Male.fbx` (+ `Casual_Male.fbx`) with the animated versions, then I run `Setup Character Animations` + rebuild. *(Download is JS/Discord-gated — not curl-able, so it's your one drag-drop step; procedural fallback covers it until then.)* `P0`
 - 🟡 Fix `CharacterAnimSetup.cs` + regenerate controller + bind Avatar once clips exist `P0`
 - ⬜ Drive **bot** knockdown from `BotController` knockback (player done; bot hook added, call site TODO) `P1`
 - 🧑 Screenshot/GIF evidence that characters animate (no T-pose) `P2`
