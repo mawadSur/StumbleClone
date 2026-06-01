@@ -29,6 +29,22 @@ namespace StumbleClone.Game
             }
         }
 
+        /// How hard bots hunt and shove the human player (0..1). Separate from skill so Hard reads
+        /// as genuinely *aggressive*: it widens player-lock range, pursuit past the safe ring, and
+        /// edge-directed pushes. Easy bots mostly mind themselves; Hard bots gang the player.
+        public static float Aggression
+        {
+            get
+            {
+                switch (Current)
+                {
+                    case Difficulty.Easy: return 0.20f;
+                    case Difficulty.Hard: return 1.00f;
+                    default:              return 0.55f; // Normal
+                }
+            }
+        }
+
         public static string Label
         {
             get

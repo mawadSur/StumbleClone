@@ -14,6 +14,8 @@ namespace StumbleClone.Bots
 
         // Per-bot skill 0..1 — higher = dodges hazards more reliably, charges from farther.
         private readonly float _skill;
+        // Per-field aggression 0..1 (from difficulty) — how hard the bot hunts/shoves the player.
+        private readonly float _aggression;
         private readonly float _dodgeScanRadius;
         private readonly Collider[] _scanBuffer = new Collider[12];
 
@@ -24,6 +26,7 @@ namespace StumbleClone.Bots
             float chargeRange = 5f,
             float contactRange = GameConstants.DefaultPushRange,
             float skill = 0.7f,
+            float aggression = 0.55f,
             float dodgeScanRadius = 5.5f)
         {
             _arenaCenter = arenaCenter;
@@ -32,6 +35,7 @@ namespace StumbleClone.Bots
             _chargeRange = chargeRange;
             _contactRange = contactRange;
             _skill = Mathf.Clamp01(skill);
+            _aggression = Mathf.Clamp01(aggression);
             _dodgeScanRadius = dodgeScanRadius;
         }
 
@@ -40,55 +44,81 @@ namespace StumbleClone.Bots
             Transform t = bot.Transform;
             Vector3 pos = t.position;
 
+            // Knocked off? Scramble back toward the arena centre (BotController handles the air work).
+            bot.RecoveryAnchor = _arenaCenter;
+
             // 1) Survival first: dodge incoming arena hazards. Reaction reliability scales with
-            //    skill, so weaker bots get clipped more often (the field isn't a uniform blob).
+            //    skill; very aggressive bots are a touch more reckless so they keep pressing.
             ArenaObstacle hazard = FindNearestHazard(pos, out float hazardDistSqr);
-            float reactRadius = Mathf.Lerp(_dodgeScanRadius * 0.55f, _dodgeScanRadius, _skill);
+            float caution = 1f - 0.3f * _aggression;
+            float reactRadius = Mathf.Lerp(_dodgeScanRadius * 0.55f, _dodgeScanRadius, _skill) * caution;
             if (hazard != null && hazardDistSqr <= reactRadius * reactRadius)
             {
                 Vector3 away = pos - hazard.transform.position; away.y = 0f;
                 if (away.sqrMagnitude < 0.01f) away = (_arenaCenter != null ? pos - _arenaCenter.position : -t.forward);
                 away.Normalize();
 
-                // Sidestep away from the hazard, but bias back toward center so the dodge
-                // doesn't fling the bot off the rim.
                 Vector3 dodge = pos + away * 3.5f;
                 if (_arenaCenter != null) dodge = Vector3.Lerp(dodge, _arenaCenter.position, 0.35f);
                 bot.SetDestination(dodge);
 
-                // Hop over a very close low hazard (boulders/rams) — skill gates the timing.
                 float jumpSqr = (_dodgeScanRadius * 0.4f) * (_dodgeScanRadius * 0.4f);
                 if (hazardDistSqr <= jumpSqr && Random.value < _skill) bot.Jump();
                 return;
             }
 
-            // 2) Don't drift off the edge.
             float distFromCenter = _arenaCenter != null
                 ? Vector3.Distance(new Vector3(pos.x, _arenaCenter.position.y, pos.z), _arenaCenter.position)
                 : 0f;
             float safeRing = _arenaRadius * _safeRingFraction;
-            if (_arenaCenter != null && distFromCenter > safeRing)
-            {
-                bot.SetDestination(_arenaCenter.position);
-                return;
-            }
+            // Aggressive bots will chase past the safe ring (to shove the victim off at the rim).
+            float huntRing = Mathf.Lerp(safeRing, _arenaRadius * 0.96f, _aggression);
 
-            // 3) Hunt the nearest racer and shove them. Skill widens the charge range (more aggressive).
-            float charge = _chargeRange * Mathf.Lerp(0.7f, 1.25f, _skill);
-            IRacer target = FindNearestTarget(bot, pos);
+            // 2) Pick a victim — prefer the human player, increasingly so with aggression.
+            IRacer target = SelectTarget(bot, pos, out bool targetIsPlayer);
+
+            // 3) Hunt + shove. Charge range widens with skill AND aggression.
+            float charge = _chargeRange * Mathf.Lerp(0.7f, 1.7f, Mathf.Max(_skill, _aggression));
             if (target != null)
             {
                 Vector3 targetPos = target.Transform.position;
                 float sqr = (targetPos - pos).sqrMagnitude;
-                if (sqr <= charge * charge)
+                bool inRange = sqr <= charge * charge;
+                // Commit if the target is reachable and we're allowed this far out (always for the
+                // player when aggressive — that's how bots herd you toward the edge).
+                if (inRange && (distFromCenter <= huntRing || targetIsPlayer))
                 {
                     bot.SetDestination(targetPos);
-                    if (sqr <= _contactRange * _contactRange) bot.TryPush(target);
+                    if (sqr <= _contactRange * _contactRange)
+                    {
+                        // Shove the victim OUTWARD toward the nearest edge — i.e. off the platform.
+                        Vector3 outward = _arenaCenter != null ? (targetPos - _arenaCenter.position) : (targetPos - pos);
+                        outward.y = 0f;
+                        if (outward.sqrMagnitude < 0.01f) outward = targetPos - pos;
+                        bot.TryPushToward(target, outward);
+                    }
                     return;
                 }
             }
 
+            // 4) Nothing to chase — keep to safe ground.
             if (_arenaCenter != null) bot.SetDestination(_arenaCenter.position);
+        }
+
+        /// Choose who to chase. The human player is preferred within a lock range that grows with
+        /// aggression — Easy bots only pick the player if they're basically the nearest racer, Hard
+        /// bots commit to the player from anywhere in the arena.
+        private IRacer SelectTarget(BotController self, Vector3 pos, out bool isPlayer)
+        {
+            isPlayer = false;
+            IRacer player = RacerRegistry.Player;
+            if (player != null && player != (IRacer)self && player.IsAlive && !player.IsFinished)
+            {
+                float pSqr = (player.Transform.position - pos).sqrMagnitude;
+                float lockRange = Mathf.Lerp(_chargeRange * 0.8f, _arenaRadius * 2.2f, _aggression);
+                if (pSqr <= lockRange * lockRange) { isPlayer = true; return player; }
+            }
+            return FindNearestTarget(self, pos);
         }
 
         private ArenaObstacle FindNearestHazard(Vector3 pos, out float bestSqr)

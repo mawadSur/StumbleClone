@@ -123,7 +123,8 @@ namespace StumbleClone.Bots
                 case LevelMode.Survival:
                     return new SurvivalBotBehavior(safeAnchor);
                 case LevelMode.LastStanding:
-                    return new LastStandBotBehavior(arenaCenter, arenaRadius, skill: skill);
+                    return new LastStandBotBehavior(arenaCenter, arenaRadius, skill: skill,
+                        aggression: BotDifficulty.Aggression);
                 default:
                     return new RaceBotBehavior(finishLine);
             }
