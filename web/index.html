@@ -40,12 +40,13 @@
         position: fixed; inset: 0; z-index: 1;
         display: flex; align-items: center; justify-content: center;
       }
-      /* Letterbox the game to a centered 16:9 stage so the themed backdrop frames it
-         (a full-bleed canvas would clear opaque and hide the background entirely). */
+      /* Center the game as a 16:9 stage that leaves a margin, so the themed backdrop is
+         always visible framing it (a full-bleed canvas covers the gradient entirely — and on
+         a 16:9 monitor a pure letterbox is full-bleed). Use the Fullscreen button for edge-to-edge. */
       #unity-canvas {
         aspect-ratio: 16 / 9;
-        width: min(100vw, calc(100vh * 16 / 9));
-        height: min(100vh, calc(100vw * 9 / 16));
+        width: min(90vw, calc(85vh * 16 / 9));
+        height: min(85vh, calc(90vw * 9 / 16));
         display: block; background: transparent;
         border-radius: 16px;
         box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);

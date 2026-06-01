@@ -53,7 +53,6 @@ namespace StumbleClone.Player
 
         private Rigidbody _rb;
         private CapsuleCollider _collider;
-        private Renderer[] _renderers;
         private PlayerInputHandler _input;
         private PlayerAnimator _animator;
         private Transform _cameraTransform;
@@ -86,7 +85,6 @@ namespace StumbleClone.Player
         {
             _rb = GetComponent<Rigidbody>();
             _collider = GetComponent<CapsuleCollider>();
-            _renderers = GetComponentsInChildren<Renderer>(true);
             _input = GetComponent<PlayerInputHandler>();
             _animator = GetComponent<PlayerAnimator>();
             _rb.freezeRotation = true;
@@ -404,9 +402,19 @@ namespace StumbleClone.Player
             }
             IsAlive = false;
             if (_collider != null) _collider.enabled = false;
-            for (int i = 0; i < _renderers.Length; i++) _renderers[i].enabled = false;
+            SetRenderersEnabled(false);
             OnEliminated?.Invoke(this);
             GameEvents.RaiseRacerEliminated(this);
+        }
+
+        // Fetch renderers live (not a cached array): a skin swap may have replaced the visual
+        // model after Awake, so a stale cache could hold destroyed renderers — touching one would
+        // throw and abort Eliminate before the elimination event fires (round never ends).
+        private void SetRenderersEnabled(bool on)
+        {
+            var renderers = GetComponentsInChildren<Renderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+                if (renderers[i] != null) renderers[i].enabled = on;
         }
 
         public void Finish()
@@ -423,7 +431,7 @@ namespace StumbleClone.Player
             _rb.linearVelocity = Vector3.zero;
             _rb.angularVelocity = Vector3.zero;
             if (_collider != null) _collider.enabled = true;
-            for (int i = 0; i < _renderers.Length; i++) _renderers[i].enabled = true;
+            SetRenderersEnabled(true);
             IsAlive = true;
             _inputLockUntil = 0f;
             _dashArmed = true;
