@@ -91,9 +91,10 @@ nothing plays. Avatars unbound (`m_Avatar:0`); controller motions are dangling r
 - ✅ Unified score model: `score` + per-mode `ScoreFor()` in `LevelResult.cs`
 - ✅ `LeaderboardEntry` + `LeaderboardStore` (JSON via Newtonsoft → PlayerPrefs, cross-platform incl. WebGL)
 - ✅ Recording on `LevelEnded` (in `GameManager`, player-runs only) + player-name get/set in store
-- ⬜ Capture player name UI (TMP_InputField → `LeaderboardStore.SetPlayerName`) `P1` 🧑 *(needs scene)*
-- ⬜ Real TITLE screen (panel in MainMenu: logo + "press/tap to start" + music hook) `P1` 🧑 *(needs scene)*
-- ⬜ `LeaderboardUI` panel + mode tabs + Leaderboard button on main menu `P1` 🧑 *(needs scene)*
+- ✅ Player name UI (TMP_InputField in TitleScreen → `LeaderboardStore.SetPlayerName`)
+- ✅ Real TITLE screen — `TitleScreen.cs` runtime overlay (branded title + name entry + START), self-instantiates on MainMenu, **no rebuild needed**
+- ✅ `LeaderboardUI.cs` — leaderboard button + panel with mode tabs (Race/Survival/Knockout), top-10 from `LeaderboardStore`
+- ⬜ "View Leaderboard / New best!" affordance on EndScreen `P2`
 - ⬜ "View Leaderboard" / "New best!" on EndScreen `P2`
 - 🧑 Wire new SerializeField refs in `MainMenu.unity` (binary scene — in-editor) `P1`
 - 🧑 *Optional* global leaderboard: Vercel serverless (`/api/scores`) + KV/Upstash + `GlobalLeaderboardClient` w/ offline fallback `P2`
