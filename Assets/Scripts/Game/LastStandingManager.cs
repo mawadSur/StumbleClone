@@ -1,6 +1,5 @@
 using StumbleClone.Core;
 using StumbleClone.Obstacles;
-using StumbleClone.UI;
 using UnityEngine;
 
 namespace StumbleClone.Game
@@ -20,7 +19,6 @@ namespace StumbleClone.Game
 
         private bool _ended;
         private ObstacleSpawner _spawner;
-        private SpectateController _spectate;
 
         private void OnEnable()
         {
@@ -50,13 +48,8 @@ namespace StumbleClone.Game
                 go.transform.SetParent(transform, false);
                 _spawner = go.AddComponent<ObstacleSpawner>();
             }
-
-            if (_spectate == null)
-            {
-                var go = new GameObject("SpectateController");
-                go.transform.SetParent(transform, false);
-                _spectate = go.AddComponent<SpectateController>();
-            }
+            // SpectateController is now self-bootstrapping in every gameplay scene
+            // (see SpectateController.Bootstrap), so the mode no longer creates one here.
         }
 
         private void HandleRacerEliminated(IRacer racer)

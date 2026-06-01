@@ -28,6 +28,11 @@ namespace StumbleClone.Core
         public const float DefaultPushCooldown = 0.8f;
         public const float KnockbackUpward = 4f;
 
+        // Air dash (triggered by a second jump press while airborne)
+        public const float DefaultDashSpeed = 18f;     // planar burst speed
+        public const float DefaultDashDuration = 0.18f; // gravity-cancelled window
+        public const float DefaultSpawnSeparation = 1.5f; // min XZ gap between a bot spawn and the player
+
         // Bot tuning
         public const int DefaultBotsPerLevel = 7;
         public const float BotPathRefreshRate = 0.5f;

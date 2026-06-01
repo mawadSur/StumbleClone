@@ -13,6 +13,7 @@ namespace StumbleClone.UI
     {
         private const string MenuScene = "MainMenu";
         private TMP_InputField _nameInput;
+        private TMP_Text _difficultyLabel;
         private GameObject _overlay;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -40,23 +41,36 @@ namespace StumbleClone.UI
                 Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
             var title = RuntimeUI.Label(bg.transform, "STUMBLE CLONE", 120,
-                new Vector2(0.5f, 0.72f), Vector2.zero, new Vector2(1500f, 200f));
+                new Vector2(0.5f, 0.82f), Vector2.zero, new Vector2(1500f, 200f));
             title.fontStyle = FontStyles.Bold;
             title.color = new Color(1f, 0.85f, 0.2f);
 
             RuntimeUI.Label(bg.transform, "Knockout party arena — last one standing wins", 38,
-                new Vector2(0.5f, 0.6f), Vector2.zero, new Vector2(1400f, 80f));
+                new Vector2(0.5f, 0.71f), Vector2.zero, new Vector2(1400f, 80f));
 
+            // Name entry: label sits just above its input box.
             RuntimeUI.Label(bg.transform, "YOUR NAME", 28,
-                new Vector2(0.5f, 0.46f), Vector2.zero, new Vector2(600f, 50f));
+                new Vector2(0.5f, 0.6f), Vector2.zero, new Vector2(600f, 50f));
             _nameInput = RuntimeUI.InputField(bg.transform, "Player", LeaderboardStore.GetPlayerName(),
-                new Vector2(0.5f, 0.46f), new Vector2(0f, -60f), new Vector2(480f, 70f));
+                new Vector2(0.5f, 0.6f), new Vector2(0f, -62f), new Vector2(480f, 70f));
+
+            // Bot difficulty — tap to cycle Easy / Normal / Hard. Persisted for every round.
+            var diffBtn = RuntimeUI.Button(bg.transform, "BOTS: " + BotDifficulty.Label,
+                new Color(0.42f, 0.36f, 0.2f),
+                new Vector2(0.5f, 0.42f), Vector2.zero, new Vector2(460f, 70f), OnCycleDifficulty);
+            _difficultyLabel = diffBtn.GetComponentInChildren<TMP_Text>();
 
             // PLAY drops straight into the deathmatch (the focused mode) — no second menu.
             RuntimeUI.Button(bg.transform, "PLAY", new Color(0.2f, 0.55f, 0.3f),
-                new Vector2(0.5f, 0.3f), Vector2.zero, new Vector2(440f, 100f), OnPlay);
+                new Vector2(0.5f, 0.28f), Vector2.zero, new Vector2(440f, 96f), OnPlay);
             RuntimeUI.Button(bg.transform, "LEADERBOARD", new Color(0.2f, 0.3f, 0.55f),
-                new Vector2(0.5f, 0.16f), Vector2.zero, new Vector2(440f, 72f), OnLeaderboard);
+                new Vector2(0.5f, 0.14f), Vector2.zero, new Vector2(440f, 68f), OnLeaderboard);
+        }
+
+        private void OnCycleDifficulty()
+        {
+            BotDifficulty.Cycle();
+            if (_difficultyLabel != null) _difficultyLabel.text = "BOTS: " + BotDifficulty.Label;
         }
 
         private void OnPlay()

@@ -25,6 +25,7 @@ namespace StumbleClone.EditorTools
             {
                 BuilderUtils.SetPrivate(comp, "mode", LevelMode.Survival);
                 BuilderUtils.SetPrivate(comp, "botCount", GameConstants.DefaultBotsPerLevel);
+                BuilderUtils.SetPrivate(comp, "spawnPointOffset", 1); // player owns spawn point 0
             });
             BuilderUtils.AttachByName(root.transform, "SurvivalManager", "StumbleClone.Game.SurvivalManager");
             BuilderUtils.AttachByName(root.transform, "LevelSelfStart", "StumbleClone.Game.LevelSelfStart", configure: comp =>
@@ -50,6 +51,7 @@ namespace StumbleClone.EditorTools
         {
             var arena = BuilderUtils.CreatePrimitive(PrimitiveType.Cylinder, "Arena", parent, new Vector3(0f, 0f, 0f), new Vector3(30f, 0.5f, 30f), Color.HSVToRGB(0.12f, 0.4f, 0.95f));
             BuilderUtils.MarkGround(arena);
+            BuilderUtils.UseMeshGroundCollider(arena); // cylinder CapsuleCollider would eject the player
         }
 
         private static void BuildSweepers(Transform parent)

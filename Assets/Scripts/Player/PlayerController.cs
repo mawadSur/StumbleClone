@@ -28,12 +28,26 @@ namespace StumbleClone.Player
         [Tooltip("How early a jump press is remembered and fired once grounded.")]
         [SerializeField] private float jumpBufferTime = 0.1f;
 
+        [Header("Air Dash")]
+        [Tooltip("A second jump press while airborne fires a horizontal dash instead of a jump.")]
+        [SerializeField] private bool airDashEnabled = true;
+        [Tooltip("Planar speed of the dash burst (units/s).")]
+        [SerializeField] private float dashSpeed = GameConstants.DefaultDashSpeed;
+        [Tooltip("How long the dash holds its speed with gravity cancelled (s).")]
+        [SerializeField] private float dashDuration = GameConstants.DefaultDashDuration;
+
         [Header("Identity")]
         [SerializeField] private int racerId = 0;
         [SerializeField] private string displayName = "Player";
 
         [Header("Tuning")]
         [SerializeField] private float inputLockOnKnockback = 0.3f;
+
+        [Header("Spawn Safety")]
+        [Tooltip("Seconds after spawn during which the player can't be eliminated; falls/pushes snap back to the spawn point instead. Guards against being shoved off the map by a spawn-frame collider overlap.")]
+        [SerializeField] private float spawnGrace = 1.5f;
+        [Tooltip("Log spawn diagnostics (ground below, overlapping colliders) once on Start.")]
+        [SerializeField] private bool logSpawnDiagnostics = true;
 
         private const float TurnSmoothTime = 0.08f;
 
@@ -50,6 +64,12 @@ namespace StumbleClone.Player
         private bool _onWalkableSlope;
         private float _lastGroundedTime = float.NegativeInfinity;
         private float _jumpBufferedTime = float.NegativeInfinity;
+        private Vector3 _spawnPoint;
+        private float _spawnSafeUntil;
+        private float _lastResnapLogTime = float.NegativeInfinity;
+        private bool _dashArmed;            // one dash per airborne stint; re-armed on landing
+        private bool _dashing;
+        private float _dashUntil = float.NegativeInfinity;
 
         public int RacerId => racerId;
         public string DisplayName => displayName;
@@ -84,6 +104,55 @@ namespace StumbleClone.Player
         private void Start()
         {
             RefreshCamera();
+            _spawnPoint = transform.position;
+            _spawnSafeUntil = Time.time + spawnGrace;
+            if (logSpawnDiagnostics) RunSpawnDiagnostics();
+        }
+
+        // One-shot spawn report: what's under the player, and is anything overlapping the
+        // capsule right now (which would make PhysX shove the player off the map). Read the
+        // Console for "[PlayerSpawn]" right after pressing Play.
+        private void RunSpawnDiagnostics()
+        {
+            Vector3 p = transform.position;
+
+            if (Physics.Raycast(p + Vector3.up * 2f, Vector3.down, out RaycastHit hit, 100f,
+                    groundMask, QueryTriggerInteraction.Ignore))
+                Debug.Log($"[PlayerSpawn] pos={p} | ground '{hit.collider.name}' {hit.distance:F2}m below (top y={hit.point.y:F2})");
+            else
+                Debug.LogWarning($"[PlayerSpawn] pos={p} | NO ground within 100m below — spawn point is over a gap/off the level. Player will fall.");
+
+            // Capsule overlap test against everything except triggers.
+            Vector3 c = p + _collider.center;
+            float half = Mathf.Max(_collider.height * 0.5f - _collider.radius, 0f);
+            Vector3 top = c + Vector3.up * half;
+            Vector3 bot = c - Vector3.up * half;
+            Collider[] overlaps = Physics.OverlapCapsule(top, bot, _collider.radius + 0.02f, ~0,
+                QueryTriggerInteraction.Ignore);
+            int others = 0;
+            for (int i = 0; i < overlaps.Length; i++)
+            {
+                Collider o = overlaps[i];
+                if (o == _collider || o.transform.IsChildOf(transform)) continue;
+                others++;
+                Debug.LogWarning($"[PlayerSpawn] OVERLAPPING '{o.name}' (layer {LayerMask.LayerToName(o.gameObject.layer)}) — this collider is stacked on the player and will push it off at spawn.");
+            }
+            if (others == 0)
+                Debug.Log("[PlayerSpawn] no colliders overlapping the player at spawn (no push expected).");
+        }
+
+        // During the spawn-grace window, a fall/elimination is treated as a spawn glitch:
+        // snap back to the spawn point and kill momentum instead of dying.
+        private void ReSnapToSpawn()
+        {
+            transform.position = _spawnPoint;
+            _rb.linearVelocity = Vector3.zero;
+            _rb.angularVelocity = Vector3.zero;
+            if (logSpawnDiagnostics && Time.time - _lastResnapLogTime > 0.25f)
+            {
+                _lastResnapLogTime = Time.time;
+                Debug.LogWarning($"[PlayerSpawn] recovered to spawn {_spawnPoint} during grace window — something is displacing the player at start.");
+            }
         }
 
         // Camera.main does a tag scan; cache it. Re-fetched lazily if the rig
@@ -110,6 +179,7 @@ namespace StumbleClone.Player
 
             if (transform.position.y < GameConstants.WorldKillY)
             {
+                if (Time.time < _spawnSafeUntil) { ReSnapToSpawn(); return; }
                 Eliminate();
                 return;
             }
@@ -117,8 +187,14 @@ namespace StumbleClone.Player
             UpdateInputLock();
             UpdateGrounded();
 
-            if (_grounded) _lastGroundedTime = Time.time;
-            if (_input != null && _input.JumpPressedMasked) _jumpBufferedTime = Time.time;
+            if (_grounded)
+            {
+                _lastGroundedTime = Time.time;
+                _dashArmed = true; // re-arm the dash every time we touch ground
+            }
+
+            bool jumpPressed = _input != null && _input.JumpPressedMasked;
+            if (jumpPressed) _jumpBufferedTime = Time.time;
 
             bool withinCoyote = Time.time - _lastGroundedTime <= coyoteTime;
             bool jumpBuffered = Time.time - _jumpBufferedTime <= jumpBufferTime;
@@ -132,12 +208,69 @@ namespace StumbleClone.Player
                 _jumpBufferedTime = float.NegativeInfinity;
                 _lastGroundedTime = float.NegativeInfinity;
             }
+            else if (airDashEnabled && jumpPressed && !_grounded && !withinCoyote && _dashArmed)
+            {
+                // Second jump press while airborne -> dash instead of a (non-existent) double jump.
+                Dash();
+                _dashArmed = false;
+                _jumpBufferedTime = float.NegativeInfinity;
+            }
         }
 
         private void FixedUpdate()
         {
             if (!IsAlive || IsFinished) return;
+
+            if (_dashing)
+            {
+                if (Time.time < _dashUntil)
+                {
+                    // Cancel gravity so the burst stays flat and snappy instead of arcing down.
+                    // ApplyMovement won't stomp it: planar speed exceeds moveSpeed, so the
+                    // knockback guard lets physics carry the dash.
+                    _rb.AddForce(-Physics.gravity, ForceMode.Acceleration);
+                }
+                else
+                {
+                    // Dash window over — clamp planar speed back to moveSpeed so control returns
+                    // immediately (the body has no drag to bleed the burst off on its own).
+                    Vector3 v = _rb.linearVelocity;
+                    Vector3 planar = new Vector3(v.x, 0f, v.z);
+                    if (planar.magnitude > moveSpeed)
+                    {
+                        planar = planar.normalized * moveSpeed;
+                        v.x = planar.x;
+                        v.z = planar.z;
+                        _rb.linearVelocity = v;
+                    }
+                    _dashing = false;
+                }
+            }
+
             ApplyMovement();
+        }
+
+        private void Dash()
+        {
+            // Dash toward current input; if there's no input, dash where the body faces.
+            Vector2 raw = _input != null ? _input.MoveMasked : Vector2.zero;
+            Vector3 dir = ComputeMoveDirection(raw);
+            if (dir.sqrMagnitude < 0.01f) dir = transform.forward;
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.0001f) dir = Vector3.forward;
+            dir.Normalize();
+
+            // Flat horizontal burst — drop any falling velocity so the dash reads clean.
+            _rb.linearVelocity = dir * dashSpeed;
+            _dashUntil = Time.time + dashDuration;
+            _dashing = true;
+
+            // Face the dash direction immediately for readability.
+            float yaw = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
+            _rb.MoveRotation(Quaternion.Euler(0f, yaw, 0f));
+
+            AudioManager.Play(Sfx.Jump);
+            if (_animator != null) _animator.TriggerDash();
         }
 
         private void UpdateInputLock()
@@ -262,6 +395,13 @@ namespace StumbleClone.Player
         public void Eliminate()
         {
             if (!IsAlive) return;
+            // Spawn grace: a kill-zone hit or fall in the first moments is almost certainly a
+            // spawn-placement/overlap glitch, not real play. Recover instead of dying.
+            if (Time.time < _spawnSafeUntil)
+            {
+                ReSnapToSpawn();
+                return;
+            }
             IsAlive = false;
             if (_collider != null) _collider.enabled = false;
             for (int i = 0; i < _renderers.Length; i++) _renderers[i].enabled = false;
@@ -286,6 +426,9 @@ namespace StumbleClone.Player
             for (int i = 0; i < _renderers.Length; i++) _renderers[i].enabled = true;
             IsAlive = true;
             _inputLockUntil = 0f;
+            _dashArmed = true;
+            _dashing = false;
+            _dashUntil = float.NegativeInfinity;
         }
     }
 }

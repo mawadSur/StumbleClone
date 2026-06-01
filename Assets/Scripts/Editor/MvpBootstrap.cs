@@ -823,7 +823,10 @@ namespace StumbleClone.EditorTools
                 var surface = host.GetComponent<NavMeshSurface>();
                 if (surface == null) surface = host.AddComponent<NavMeshSurface>();
                 surface.collectObjects = CollectObjects.All;
-                surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
+                // Bake from RENDER meshes, not physics colliders: Unity's Cylinder primitive
+                // ships a CapsuleCollider that degenerates into a sphere when scaled flat, which
+                // would bake a dome the bots spawn inside. The render mesh is the true flat disc.
+                surface.useGeometry = NavMeshCollectGeometry.RenderMeshes;
                 surface.layerMask = ~0;
                 try
                 {

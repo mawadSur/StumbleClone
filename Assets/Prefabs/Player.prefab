@@ -143,12 +143,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 237a26fbba9f29e46948b19644d6d74b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::StumbleClone.Player.PlayerController
-  moveSpeed: 6
+  moveSpeed: 8
   jumpSpeed: 8
   groundAcceleration: 60
   airAcceleration: 25
   groundCheckDistance: 0.2
-  groundCheckRadius: 0.35
+  groundCheckRadius: 0.45
   groundMask:
     serializedVersion: 2
     m_Bits: 4294967295

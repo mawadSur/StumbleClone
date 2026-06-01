@@ -19,6 +19,7 @@ namespace StumbleClone.Animation
 
         private const float JumpDur = 0.35f;
         private const float KnockDur = 1.3f;
+        private const float DashDur = 0.28f;
 
         private Vector3 _basePos;
         private Quaternion _baseRot;
@@ -29,6 +30,7 @@ namespace StumbleClone.Animation
         private float _speed01;
         private float _jumpTimer;
         private float _knockTimer;
+        private float _dashTimer;
 
         /// Point the animator at the mesh root to animate (usually the Animator's own transform).
         public void SetVisual(Transform t)
@@ -72,6 +74,8 @@ namespace StumbleClone.Animation
 
         public void NotifyKnockedDown() => _knockTimer = KnockDur;
 
+        public void NotifyDash() => _dashTimer = DashDur;
+
         private void LateUpdate()
         {
             if (visual == null || !_captured) return;
@@ -105,18 +109,31 @@ namespace StumbleClone.Animation
                 jumpPop = 0.10f * s;
             }
 
+            // ---- Dash: low feet-first SLIDE — drop, recline back, stretch along travel ----
+            float dashLean = 0f, dashStretchZ = 1f, dashSquashY = 1f, dashLower = 0f;
+            if (_dashTimer > 0f)
+            {
+                _dashTimer -= dt;
+                float d = Mathf.Clamp01(_dashTimer / DashDur); // 1→0 over the move
+                float s = Mathf.Sin(Mathf.Clamp01(d) * Mathf.PI); // 0→1→0 ease
+                dashLean = -34f * d;          // recline BACK for a feet-first slide
+                dashStretchZ = 1f + 0.30f * s; // stretch along facing (slide streak)
+                dashSquashY = 1f - 0.32f * s;  // crouch low
+                dashLower = 0.30f * s;         // drop toward the ground
+            }
+
             // ---- Locomotion: bob + lean + sway, idle breathing --------------------
             float bob = Mathf.Abs(Mathf.Sin(_phase)) * bobHeight * _speed01;
             float breath = (_speed01 < 0.05f) ? Mathf.Sin(Time.time * 2f) * idleBreath : 0f;
-            float lean = maxLeanDeg * _speed01;
+            float lean = maxLeanDeg * _speed01 + dashLean;
             float sway = Mathf.Sin(_phase) * swayRollDeg * _speed01;
 
-            visual.localPosition = _basePos + Vector3.up * (bob + jumpPop);
+            visual.localPosition = _basePos + Vector3.up * (bob + jumpPop - dashLower);
             visual.localRotation = _baseRot * Quaternion.Euler(lean, 0f, sway);
             visual.localScale = new Vector3(
                 _baseScale.x * jumpSquashXZ,
-                _baseScale.y * jumpStretchY * (1f + breath),
-                _baseScale.z * jumpSquashXZ);
+                _baseScale.y * jumpStretchY * dashSquashY * (1f + breath),
+                _baseScale.z * jumpSquashXZ * dashStretchZ);
         }
     }
 }

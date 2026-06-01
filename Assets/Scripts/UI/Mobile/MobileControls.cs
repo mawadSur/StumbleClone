@@ -51,8 +51,12 @@ namespace StumbleClone.UI.Mobile
 #if UNITY_ANDROID || UNITY_IOS
             return true;
 #else
-            // WebGL on a phone (or editor with a touchscreen / device simulator).
-            return ForceShow || Application.isMobilePlatform || Touchscreen.current != null;
+            // WebGL: only on an actual phone/tablet browser, never on desktop. In WebGL
+            // Application.isMobilePlatform reads the browser user-agent (false on desktop, true
+            // on mobile). We deliberately DON'T test Touchscreen.current — touch-capable laptops
+            // and some desktop browsers report a touchscreen, which wrongly showed the overlay
+            // (and clipped it) on desktop. ForceShow still lets the editor preview the layout.
+            return ForceShow || Application.isMobilePlatform;
 #endif
         }
 

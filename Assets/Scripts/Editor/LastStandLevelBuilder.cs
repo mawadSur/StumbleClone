@@ -53,6 +53,7 @@ namespace StumbleClone.EditorTools
         {
             var arena = BuilderUtils.CreatePrimitive(PrimitiveType.Cylinder, "Arena", parent, new Vector3(0f, 0f, 0f), new Vector3(40f, 0.4f, 40f), Color.HSVToRGB(0.6f, 0.3f, 0.9f));
             BuilderUtils.MarkGround(arena);
+            BuilderUtils.UseMeshGroundCollider(arena); // cylinder CapsuleCollider would eject the player
         }
 
         private static void BuildSpawnPoints(Transform parent)

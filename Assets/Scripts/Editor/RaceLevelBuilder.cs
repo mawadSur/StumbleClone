@@ -210,6 +210,7 @@ namespace StumbleClone.EditorTools
             {
                 BuilderUtils.SetPrivate(comp, "mode", LevelMode.Race);
                 BuilderUtils.SetPrivate(comp, "botCount", GameConstants.DefaultBotsPerLevel);
+                BuilderUtils.SetPrivate(comp, "spawnPointOffset", 1); // player owns spawn point 0
             });
         }
 
@@ -252,6 +253,20 @@ namespace StumbleClone.EditorTools
             // Layer assignment uses GameConstants so the runtime grounded-check stays consistent.
             int layer = StumbleClone.Core.GameConstants.LayerGround;
             if (layer >= 0 && layer < 32) go.layer = layer;
+        }
+
+        /// Replace a primitive's auto-added collider with a MeshCollider that follows the mesh.
+        /// REQUIRED for Cylinder grounds: Unity's Cylinder primitive ships a CapsuleCollider, and
+        /// scaling it flat-and-wide (arena discs) degenerates it into a giant sphere the player
+        /// spawns inside — PhysX then flings the player off the map.
+        public static void UseMeshGroundCollider(GameObject go)
+        {
+            var mf = go.GetComponent<MeshFilter>();
+            if (mf == null || mf.sharedMesh == null) return;
+            var existing = go.GetComponent<Collider>();
+            if (existing != null) UnityEngine.Object.DestroyImmediate(existing);
+            var mc = go.AddComponent<MeshCollider>();
+            mc.sharedMesh = mf.sharedMesh;
         }
 
         public static void SetPrivate(object target, string fieldName, object value)

@@ -105,10 +105,13 @@ namespace StumbleClone.Game
         {
             if (scene.name == "MainMenu") return;
 
-            RacerRegistry.Clear();
-            GameEvents.Reset();
-
-            GameEvents.LevelEnded += HandleLevelEnded;
+            // Do NOT clear the registry or Reset() the event bus here. Per-scene racers, managers
+            // (LastStanding/Race/Survival) and HUDs register/subscribe in their OnEnable, which
+            // runs BEFORE this sceneLoaded callback — clearing/resetting now would wipe those fresh
+            // registrations, so LastStandingManager never gets LevelStarted (no hazards spawn) and
+            // the player is missing from RacerRegistry (broken win/AliveCount). Every object already
+            // unregisters/unsubscribes in OnDisable on scene unload, so this cleanup is redundant.
+            // GameManager's own LevelEnded subscription is made once in Awake and persists.
 
             StartCoroutine(RaiseLevelStartedNextFrame());
         }

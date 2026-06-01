@@ -23,6 +23,14 @@ namespace StumbleClone.Level
             var racer = other.GetComponentInParent<IRacer>();
             if (racer == null || !racer.IsAlive || racer.IsFinished) return;
 
+            // The human player gets one life in every mode: falling off eliminates for good
+            // (no respawn). The spectate/Play-Again flow takes over from there.
+            if (racer.IsPlayer)
+            {
+                racer.Eliminate();
+                return;
+            }
+
             // Resolve the mode robustly: GameManager (menu flow) → the scene's own
             // LevelSelfStart (Play-scene-directly flow) → serialized fallback. Without the
             // LevelSelfStart hop, a directly-played LastStanding scene would fall back to
