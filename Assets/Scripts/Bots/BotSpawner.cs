@@ -63,6 +63,11 @@ namespace StumbleClone.Bots
                 bot.displayName = BotNameGenerator.GetUnique();
                 bot.behavior = CreateBehavior(mode);
 
+                // Per-bot skill variation so the field isn't a uniform blob — vary move speed
+                // ±~13% around the default. (Agent is cached in BotController.Awake during Instantiate.)
+                if (bot.Agent != null)
+                    bot.Agent.speed = GameConstants.DefaultMoveSpeed * Random.Range(0.85f, 1.13f);
+
                 go.name = "Bot_" + bot.displayName;
                 spawned++;
             }
