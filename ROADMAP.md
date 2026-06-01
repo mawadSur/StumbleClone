@@ -52,7 +52,7 @@ directions, no patterns, no telegraph, not learnable. Replace with a telegraphed
 ## EPIC 2 — Bots & gameplay polish (bots already navigate + compete)
 
 - 🟡 Verify NavMesh baked + BotSpawner wired in all 3 scenes (only verifiable in-editor) `P0` 🧑
-- ⬜ Remove dead shrink-ring path (`ShrinkRadiusChanged`, `ShrinkingZoneVisualizer`, inert HUD zoneIndicator) `P1`
+- ✅ Removed dead shrink-ring path (`ShrinkRadiusChanged` event, `ShrinkingZoneVisualizer`, inert HUD coupling)
 - ⬜ Last-Standing bot hazard-avoidance (scan `ArenaObstacle`, sidestep/jump) so the contest feels earned `P2`
 - ⬜ Per-bot skill variation (speed/aggression/reaction jitter) — currently all 7 identical `P2`
 - ⬜ EditMode tests for win conditions (Race/Survival/LastStanding + GameEvents symmetry) — required by CLAUDE.md `P3`
