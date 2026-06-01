@@ -27,7 +27,18 @@ namespace StumbleClone.UI
             if (continueButton != null) continueButton.onClick.AddListener(OnContinueClicked);
             if (menuButton != null) menuButton.onClick.AddListener(OnMenuClicked);
 
+            ApplyTheme();
+
             if (panel != null) panel.SetActive(false);
+        }
+
+        private void ApplyTheme()
+        {
+            ThemeBinder.StyleScrim(panel);
+            ThemeBinder.StyleText(resultText, UITheme.Gold);
+            ThemeBinder.StyleText(statsText, UITheme.OnSurfaceMuted);
+            ThemeBinder.StyleButton(continueButton, UITheme.Primary);
+            ThemeBinder.StyleButton(menuButton, UITheme.Neutral);
         }
 
         private void OnDisable()
@@ -54,7 +65,7 @@ namespace StumbleClone.UI
                 return;
             }
 
-            if (panel != null) panel.SetActive(true);
+            if (panel != null) { panel.SetActive(true); OverlayIntro.Play(panel); }
 
             int totalRacers = RacerRegistry.All.Count;
             if (totalRacers <= 0) totalRacers = 8;

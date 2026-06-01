@@ -25,6 +25,11 @@ namespace StumbleClone.UI
             if (menuButton != null) menuButton.onClick.AddListener(OnMenuClicked);
             if (quitButton != null) quitButton.onClick.AddListener(OnQuitClicked);
 
+            ThemeBinder.StyleScrim(panel);
+            ThemeBinder.StyleButton(resumeButton, UITheme.Primary);
+            ThemeBinder.StyleButton(menuButton, UITheme.Neutral);
+            ThemeBinder.StyleButton(quitButton, UITheme.Danger);
+
             if (panel != null) panel.SetActive(false);
         }
 
@@ -50,7 +55,11 @@ namespace StumbleClone.UI
         {
             isPaused = !isPaused;
             Time.timeScale = isPaused ? 0f : 1f;
-            if (panel != null) panel.SetActive(isPaused);
+            if (panel != null)
+            {
+                panel.SetActive(isPaused);
+                if (isPaused) OverlayIntro.Play(panel);
+            }
         }
 
         private void OnResumeClicked()

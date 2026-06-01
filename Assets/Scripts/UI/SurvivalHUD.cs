@@ -12,6 +12,12 @@ namespace StumbleClone.UI
         [SerializeField] private TMP_Text aliveCountText;
         [SerializeField] private TMP_Text timerText;
 
+        private void Awake()
+        {
+            ThemeBinder.StyleText(aliveCountText, UITheme.OnSurface);
+            ThemeBinder.StyleText(timerText, UITheme.OnSurface);
+        }
+
         private void OnEnable()
         {
             GameEvents.SurvivalTimerTick += HandleTimerTick;

@@ -39,6 +39,9 @@ namespace StumbleClone.UI
             {
                 levelSelectPanel.SetActive(false);
             }
+
+            ThemeBinder.StyleButton(playButton, UITheme.Primary);
+            ThemeBinder.StyleButton(quitButton, UITheme.Neutral);
         }
 
         private void OnDestroy()

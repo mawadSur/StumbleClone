@@ -13,6 +13,11 @@ namespace StumbleClone.UI
         [SerializeField] private TMP_Text aliveCountText;
         [SerializeField] private Image zoneIndicator;
 
+        private void Awake()
+        {
+            ThemeBinder.StyleText(aliveCountText, UITheme.OnSurface);
+        }
+
         private void OnEnable()
         {
             GameEvents.RacerEliminated += HandleRacerEliminated;
@@ -38,7 +43,7 @@ namespace StumbleClone.UI
         private void ApplyIndicatorColor()
         {
             if (zoneIndicator == null) return;
-            zoneIndicator.color = new Color(0.85f, 0.2f, 0.2f, 0.9f); // danger red — hazards active
+            zoneIndicator.color = new Color(UITheme.Danger.r, UITheme.Danger.g, UITheme.Danger.b, 0.9f); // hazards active
         }
 
         private void RefreshAliveCount()

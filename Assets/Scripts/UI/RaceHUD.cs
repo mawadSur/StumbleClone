@@ -16,6 +16,12 @@ namespace StumbleClone.UI
         private bool timerRunning;
         private int currentRank = 1;
 
+        private void Awake()
+        {
+            ThemeBinder.StyleText(rankText, UITheme.OnSurface);
+            ThemeBinder.StyleText(timerText, UITheme.OnSurface);
+        }
+
         private void OnEnable()
         {
             GameEvents.LevelStarted += HandleLevelStarted;

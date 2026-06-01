@@ -20,7 +20,14 @@ namespace StumbleClone.UI
             if (survivalButton != null) survivalButton.onClick.AddListener(OnSurvivalClicked);
             if (lastStandingButton != null) lastStandingButton.onClick.AddListener(OnLastStandingClicked);
             if (backButton != null) backButton.onClick.AddListener(OnBackClicked);
+
+            ThemeBinder.StyleButton(raceButton, UITheme.Secondary);
+            ThemeBinder.StyleButton(survivalButton, UITheme.Secondary);
+            ThemeBinder.StyleButton(lastStandingButton, UITheme.Secondary);
+            ThemeBinder.StyleButton(backButton, UITheme.Neutral);
         }
+
+        private void OnEnable() => OverlayIntro.Play(gameObject);
 
         private void OnDestroy()
         {
