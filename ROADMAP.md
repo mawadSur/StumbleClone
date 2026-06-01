@@ -64,13 +64,13 @@ directions, no patterns, no telegraph, not learnable. Replace with a telegraphed
 32 Quaternius meshes + controller + driver scripts exist, but **no `.anim` clips** anywhere, so
 nothing plays. Avatars unbound (`m_Avatar:0`); controller motions are dangling refs.
 
-- 🧑 Import an **animated** character pack (Quaternius Ultimate Animated — same `CharacterArmature` rig CharacterAnimSetup expects — or Mixamo) `P0`
-- ⬜ `ProceduralCharacterAnimator.cs` — bob/lean/limb-swing/jump-crouch/topple fallback so it looks alive *before* clips land `P0`
-- 🟡 Fix `CharacterAnimSetup.cs`: bail-on-missing-clips guard, EditorPref gating, ensure it binds the Avatar `P0`
-- 🟡 Regenerate `CharacterLocomotion.controller` (drop dangling motions) once clips exist `P0`
-- ⬜ Drive bot Jump/Fall/KnockedDown params (`BotAnimator` only sets Speed/Grounded) `P1`
-- ⬜ Call `PlayerAnimator.TriggerKnockedDown()` from `PlayerController.Knockback` (currently dead code) `P1`
-- ⬜ Fix `PlayerAnimator.maxSpeedForNormalization` 8→6 so Run blends fully `P2`
+- ✅ `ProceduralCharacterAnimator.cs` — bob/lean/sway/jump-squash/knockdown-topple fallback so it looks alive *before* clips land
+- ✅ `AnimatorClipUtil` — auto-attaches the fallback when an Animator has no clips (no prefab edits); auto-off once clips exist
+- ✅ `PlayerAnimator`/`BotAnimator` route to the fallback; fixed `maxSpeedForNormalization` 8→6
+- ✅ `PlayerController.Knockback` now triggers the knockdown reaction (was dead code)
+- 🧑 Import an **animated** character pack (Quaternius Ultimate Animated — same `CharacterArmature` rig — or Mixamo) → upgrades from procedural to real skeletal anim `P0`
+- 🟡 Fix `CharacterAnimSetup.cs` + regenerate controller + bind Avatar once clips exist `P0`
+- ⬜ Drive **bot** knockdown from `BotController` knockback (player done; bot hook added, call site TODO) `P1`
 - 🧑 Screenshot/GIF evidence that characters animate (no T-pose) `P2`
 
 ---
