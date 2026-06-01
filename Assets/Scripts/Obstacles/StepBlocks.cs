@@ -52,8 +52,7 @@ namespace StumbleClone.Obstacles
                 // Start sunken (top flush with floor); rise into place in Update.
                 cube.transform.position = new Vector3(top.x, -height, top.z);
 
-                var rend = cube.GetComponent<Renderer>();
-                if (rend != null) rend.material.color = _color;
+                RuntimeMaterial.Apply(cube, _color); // URP/Lit — default primitive mat is pink in URP
 
                 _blocks[i] = cube.transform;
             }

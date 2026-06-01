@@ -216,8 +216,8 @@ namespace StumbleClone.Obstacles
 
         private static void Tint(GameObject go, Color color)
         {
-            var rend = go.GetComponent<Renderer>();
-            if (rend != null) rend.material.color = color;
+            // URP/Lit material — the default primitive material is built-in Standard (pink in URP).
+            RuntimeMaterial.Apply(go, color);
         }
     }
 }

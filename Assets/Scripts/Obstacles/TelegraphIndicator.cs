@@ -29,6 +29,10 @@ namespace StumbleClone.Obstacles
             go.transform.position = new Vector3(rimPoint.x, groundY + 0.05f, rimPoint.z);
             go.transform.localScale = new Vector3(diameter, 0.02f, diameter);
 
+            // URP/Lit emissive base (default primitive material is built-in Standard = pink in URP);
+            // the per-frame MaterialPropertyBlock then drives _BaseColor/_EmissionColor on it.
+            RuntimeMaterial.Apply(go, Warn, emissive: true);
+
             var ti = go.AddComponent<TelegraphIndicator>();
             ti._life = Mathf.Max(0.1f, life);
             ti._rend = go.GetComponent<Renderer>();
