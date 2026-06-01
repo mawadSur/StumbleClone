@@ -40,6 +40,7 @@ namespace StumbleClone.Player
         private CapsuleCollider _collider;
         private Renderer[] _renderers;
         private PlayerInputHandler _input;
+        private PlayerAnimator _animator;
         private Transform _cameraTransform;
         private float _inputLockUntil;
         private float _turnVelocity;
@@ -66,6 +67,7 @@ namespace StumbleClone.Player
             _collider = GetComponent<CapsuleCollider>();
             _renderers = GetComponentsInChildren<Renderer>(true);
             _input = GetComponent<PlayerInputHandler>();
+            _animator = GetComponent<PlayerAnimator>();
             _rb.freezeRotation = true;
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
             _rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
@@ -251,6 +253,7 @@ namespace StumbleClone.Player
             if (!IsAlive) return;
             _rb.AddForce(force + Vector3.up * GameConstants.KnockbackUpward, ForceMode.Impulse);
             _inputLockUntil = Time.time + inputLockOnKnockback;
+            if (_animator != null) _animator.TriggerKnockedDown();
         }
 
         public void Eliminate()
