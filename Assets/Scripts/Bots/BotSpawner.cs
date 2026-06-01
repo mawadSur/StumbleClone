@@ -105,9 +105,14 @@ namespace StumbleClone.Bots
                 // Per-bot skill (0.35..1) drives both move speed and behavior aggression/reaction
                 // so the 7 bots feel distinct and finishing order is earned, not arbitrary.
                 float skill = Random.Range(skillMin, skillMax);
+                float aggression = BotDifficulty.Aggression;
                 bot.behavior = CreateBehavior(mode, skill);
                 if (bot.Agent != null)
-                    bot.Agent.speed = GameConstants.DefaultMoveSpeed * Mathf.Lerp(0.85f, 1.15f, skill);
+                    bot.Agent.speed = GameConstants.DefaultMoveSpeed
+                        * Mathf.Lerp(0.85f, 1.15f, skill)
+                        * Mathf.Lerp(1f, 1.3f, aggression); // aggressive bots close distance faster
+                // Aggressive bots shove harder and far more often (half the cooldown, +30% force on Hard).
+                bot.SetCombatTuning(Mathf.Lerp(1f, 0.5f, aggression), Mathf.Lerp(1f, 1.3f, aggression));
 
                 go.name = "Bot_" + bot.displayName;
                 spawned++;

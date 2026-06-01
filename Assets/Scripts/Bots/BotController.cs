@@ -19,10 +19,12 @@ namespace StumbleClone.Bots
 
         [Header("Edge recovery")]
         [Tooltip("How far to search for the platform/navmesh when knocked off, to scramble back.")]
-        [SerializeField] private float recoveryScanRadius = 16f;
-        [SerializeField] private float recoveryMoveSpeed = 7.5f;
-        [SerializeField] private float recoveryAirAccel = 22f;
-        [SerializeField] private float recoveryJumpInterval = 0.55f;
+        [SerializeField] private float recoveryScanRadius = 20f;
+        [SerializeField] private float recoveryMoveSpeed = 9f;
+        [SerializeField] private float recoveryAirAccel = 28f;
+        [Tooltip("Min seconds between recovery jumps (ground hop, then mid-air double jump).")]
+        [SerializeField] private float recoveryJumpInterval = 0.32f;
+        private const int MaxRecoveryJumps = 2; // ground hop + one mid-air = double jump
 
         public int racerId;
         public string displayName;
@@ -40,9 +42,15 @@ namespace StumbleClone.Bots
         private bool _isFinished;
         private bool _inKnockback;
         private bool _jumping;
+        private bool _recovering;
+        private int _recoveryJumpsLeft;
         private float _nextTickTime;
         private float _nextPushTime;
         private float _nextRecoveryJump;
+
+        // Combat tuning applied per difficulty by the spawner (aggressive bots push harder/more often).
+        private float _pushCooldownMul = 1f;
+        private float _pushForceMul = 1f;
 
         public int RacerId => racerId;
         public string DisplayName => string.IsNullOrEmpty(displayName) ? ("Bot_" + racerId) : displayName;
@@ -98,9 +106,11 @@ namespace StumbleClone.Bots
             bool offMesh = _agent == null || !_agent.enabled || !_agent.isOnNavMesh;
             if (offMesh && !_jumping)
             {
+                if (!_recovering) { _recovering = true; _recoveryJumpsLeft = MaxRecoveryJumps; _nextRecoveryJump = 0f; }
                 RecoverTick();
                 return;
             }
+            _recovering = false;
 
             float now = Time.time;
             if (behavior != null && now >= _nextTickTime)
@@ -139,15 +149,21 @@ namespace StumbleClone.Bots
             if (dir.sqrMagnitude > 0.001f)
                 transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir), 0.25f);
 
-            // Hop to clear the platform lip whenever we have footing.
-            if (IsGrounded() && Time.time >= _nextRecoveryJump)
+            bool grounded = IsGrounded();
+            if (grounded) _recoveryJumpsLeft = MaxRecoveryJumps; // refill on footing
+
+            // Double jump: a ground hop, then a second boost near the apex / while falling to
+            // clear the platform lip and claw back on.
+            bool canAirJump = !grounded && _rb.linearVelocity.y < 2.5f;
+            if (_recoveryJumpsLeft > 0 && Time.time >= _nextRecoveryJump && (grounded || canAirJump))
             {
+                _recoveryJumpsLeft--;
                 _nextRecoveryJump = Time.time + recoveryJumpInterval;
                 Vector3 jv = _rb.linearVelocity; jv.y = jumpSpeed; _rb.linearVelocity = jv;
             }
 
             // Back over solid navmesh and grounded — rebind the agent and resume normal behavior.
-            if (IsGrounded() && NavMesh.SamplePosition(pos, out _, 1.0f, NavMesh.AllAreas))
+            if (grounded && NavMesh.SamplePosition(pos, out _, 1.0f, NavMesh.AllAreas))
                 ResnapToNavMesh();
         }
 
@@ -210,11 +226,19 @@ namespace StumbleClone.Bots
             Vector3 toTarget = target.Transform.position - transform.position;
             if (toTarget.magnitude > pushRange) return;
 
-            _nextPushTime = Time.time + pushCooldown;
+            _nextPushTime = Time.time + pushCooldown * _pushCooldownMul;
             Vector3 d = dirRaw; d.y = 0f;
             Vector3 dir = d.sqrMagnitude > 0.0001f ? d.normalized
                 : (toTarget.sqrMagnitude > 0.0001f ? toTarget.normalized : transform.forward);
-            target.Knockback(dir * pushForce);
+            target.Knockback(dir * pushForce * _pushForceMul);
+        }
+
+        /// Per-difficulty combat scaling applied at spawn — aggressive bots shove harder and more
+        /// often. cooldownMul &lt; 1 pushes more frequently; forceMul &gt; 1 hits harder.
+        public void SetCombatTuning(float cooldownMul, float forceMul)
+        {
+            _pushCooldownMul = Mathf.Max(0.1f, cooldownMul);
+            _pushForceMul = Mathf.Max(0.1f, forceMul);
         }
 
         public void Knockback(Vector3 force)

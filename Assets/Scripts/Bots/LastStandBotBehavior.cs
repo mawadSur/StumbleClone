@@ -47,11 +47,12 @@ namespace StumbleClone.Bots
             // Knocked off? Scramble back toward the arena centre (BotController handles the air work).
             bot.RecoveryAnchor = _arenaCenter;
 
-            // 1) Survival first: dodge incoming arena hazards. Reaction reliability scales with
-            //    skill; very aggressive bots are a touch more reckless so they keep pressing.
+            // 1) Survival first: dodge incoming arena hazards. Reaction now scales UP with both
+            //    skill and aggression, so the toughest bots see hazards sooner and almost always
+            //    sidestep or hop them — aggressive no longer means careless.
             ArenaObstacle hazard = FindNearestHazard(pos, out float hazardDistSqr);
-            float caution = 1f - 0.3f * _aggression;
-            float reactRadius = Mathf.Lerp(_dodgeScanRadius * 0.55f, _dodgeScanRadius, _skill) * caution;
+            float reflex = Mathf.Max(_skill, _aggression);
+            float reactRadius = Mathf.Lerp(_dodgeScanRadius * 0.7f, _dodgeScanRadius * 1.15f, reflex);
             if (hazard != null && hazardDistSqr <= reactRadius * reactRadius)
             {
                 Vector3 away = pos - hazard.transform.position; away.y = 0f;
@@ -62,8 +63,12 @@ namespace StumbleClone.Bots
                 if (_arenaCenter != null) dodge = Vector3.Lerp(dodge, _arenaCenter.position, 0.35f);
                 bot.SetDestination(dodge);
 
-                float jumpSqr = (_dodgeScanRadius * 0.4f) * (_dodgeScanRadius * 0.4f);
-                if (hazardDistSqr <= jumpSqr && Random.value < _skill) bot.Jump();
+                // Hop over close hazards — reliable for skilled/aggressive bots, certain when imminent.
+                float jumpRange = _dodgeScanRadius * 0.5f;
+                float imminentRange = _dodgeScanRadius * 0.28f;
+                if (hazardDistSqr <= jumpRange * jumpRange &&
+                    (Random.value < reflex || hazardDistSqr <= imminentRange * imminentRange))
+                    bot.Jump();
                 return;
             }
 
@@ -77,8 +82,8 @@ namespace StumbleClone.Bots
             // 2) Pick a victim — prefer the human player, increasingly so with aggression.
             IRacer target = SelectTarget(bot, pos, out bool targetIsPlayer);
 
-            // 3) Hunt + shove. Charge range widens with skill AND aggression.
-            float charge = _chargeRange * Mathf.Lerp(0.7f, 1.7f, Mathf.Max(_skill, _aggression));
+            // 3) Hunt + shove. Charge range widens hard with skill AND aggression.
+            float charge = _chargeRange * Mathf.Lerp(0.85f, 2.3f, Mathf.Max(_skill, _aggression));
             if (target != null)
             {
                 Vector3 targetPos = target.Transform.position;
