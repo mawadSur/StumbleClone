@@ -75,3 +75,8 @@ memory/
 
 # keep the hosted APK for the web auto-deploy
 !web/StumbleClone-android.apk
+
+# Unity Android/IL2CPP build temp (Bee/CMake/ninja) that lands at project root
+.utmp/
+.bee/
+artifacts/
