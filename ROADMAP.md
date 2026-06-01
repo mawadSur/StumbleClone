@@ -9,10 +9,11 @@ Status legend: ✅ done · 🟡 partial / in progress · ⬜ todo · 🧑 needs 
 Last updated: 2026-05-31. Source of truth for "what's left." Update the boxes as work lands.
 
 **Repo is LIVE:** https://github.com/mawadSur/StumbleClone (public, pushed to `main`).
-**Session progress (2026-05-31):** ✅ Real Unity recompile = **0 compile errors**. ✅ Scenes
-**rebuilt** (`RebuildScenesOnly`, FBX prefabs preserved) — EPIC 0/1 now live + committed. ✅ EPIC
-0,1,8 done; 4 (audio), 5 (data+title+leaderboard UI), 7 (repo+CI) shipped; 3 (procedural anim)
-live. ▶ First headless **WebGL build** running. Remaining: CI secrets, animated pack, mobile/iOS builds.
+**🎮 LIVE & PLAYABLE (real skeletal animation):** https://stumbleclone.vercel.app · APK: /StumbleClone-android.apk
+**Status (2026-05-31):** EPIC 0,1,2(core),3,4,5,7,8 ✅ DONE. WebGL **built + deployed live + verified loading**
+(engine 200s). Android **APK built + hosted**. Auto-deploy on push ✅. Real skeletal animation ✅ bound + live.
+**Only remaining:** iOS — **deferred by user** to a Mac export (pipeline `build-ios.yml` ready); optional polish
+(richer anim pack, Play Store AAB, real SFX files).
 
 ---
 
@@ -69,8 +70,8 @@ nothing plays. Avatars unbound (`m_Avatar:0`); controller motions are dangling r
 - ✅ `AnimatorClipUtil` — auto-attaches the fallback when an Animator has no clips (no prefab edits); auto-off once clips exist
 - ✅ `PlayerAnimator`/`BotAnimator` route to the fallback; fixed `maxSpeedForNormalization` 8→6
 - ✅ `PlayerController.Knockback` now triggers the knockdown reaction (was dead code)
-- 🧑 **Drop-in upgrade to real skeletal anim:** download the CC0 [Quaternius Ultimate Animated Character Pack](https://quaternius.com/packs/ultimatedanimatedcharacter.html) (same `CharacterArmature` rig `CharacterAnimSetup` already expects — clips `CharacterArmature|Idle/Run/Jump/...`), replace `Assets/Art/Quaternius/Characters/BlueSoldier_Male.fbx` (+ `Casual_Male.fbx`) with the animated versions, then I run `Setup Character Animations` + rebuild. *(Download is JS/Discord-gated — not curl-able, so it's your one drag-drop step; procedural fallback covers it until then.)* `P0`
-- 🟡 Fix `CharacterAnimSetup.cs` + regenerate controller + bind Avatar once clips exist `P0`
+- ✅ **REAL SKELETAL ANIMATION DONE + LIVE** — the committed FBX already had the `CharacterArmature` takes; the issue was `avatarSetup=NoAvatar` + a gated setup. Fixed `avatarSetup`→CreateFromThisModel, ran `CharacterAnimSetup` (controller: Idle/Walk/Run blend + Jump + RecieveHit; avatars assigned), rebuilt WebGL, redeployed. (Swap in a richer animated pack later if desired — optional.)
+- ✅ `CharacterAnimSetup` ran clean; controller regenerated; avatars bound (BlueSoldier_MaleAvatar/Casual_MaleAvatar)
 - ⬜ Drive **bot** knockdown from `BotController` knockback (player done; bot hook added, call site TODO) `P1`
 - 🧑 Screenshot/GIF evidence that characters animate (no T-pose) `P2`
 
@@ -112,6 +113,7 @@ nothing plays. Avatars unbound (`m_Avatar:0`); controller motions are dangling r
 - 🟡 Verify mobile touch overlay on device (install the APK + play) `P1` 🧑
 - 🧑 Android release keystore + AAB for Play Store (debug-signed APK works for sideload testing now) `P1`
 - 🧑 App icons (1024² master) + branded splash (Unity Personal keeps watermark) `P1`
+- ⏸️ **iOS DEFERRED by user** (2026-05-31): "save the unity project then export what is needed to a Mac to get it published." Pipeline ready below.
 - ✅ **iOS build pipeline created** — `.github/workflows/build-ios.yml` builds the iOS Xcode project on a GitHub **macOS runner** via game-ci (no Mac of your own needed for the build). Manual-trigger; needs `UNITY_LICENSE` secret to run, + Apple signing secrets (commented in the workflow) for a signed `.ipa`/App Store submission.
 - 🧑 iOS final submission: add `UNITY_LICENSE` (run the workflow) + Apple Developer account/certs for a signed `.ipa` `P2`
 - ⬜ Reconcile PlatformBuilder vs ProjectSettings drift (minSdk 24/25, iOS 13/15, empty iOS usage strings) `P2`
