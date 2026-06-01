@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using StumbleClone.Core;
 using UnityEngine;
@@ -71,6 +72,20 @@ namespace StumbleClone.Game
             float duration = Time.time - _levelStartTime;
 
             lastResult = new LevelResult(currentMode, winner, playerWon, playerRank, duration);
+
+            // Record to the local leaderboard — only for runs the human player took part in.
+            if (player != null)
+            {
+                LeaderboardStore.Submit(new LeaderboardEntry
+                {
+                    playerName = LeaderboardStore.GetPlayerName(),
+                    mode = currentMode,
+                    score = lastResult.score,
+                    duration = duration,
+                    rank = playerRank,
+                    unixTimeUtc = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                });
+            }
         }
 
         private int ComputePlayerRank(IRacer player)

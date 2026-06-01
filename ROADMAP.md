@@ -87,12 +87,12 @@ nothing plays. Avatars unbound (`m_Avatar:0`); controller motions are dangling r
 
 ## EPIC 5 — Title + Menu + Leaderboard (menu flow works; no title screen, no leaderboard)
 
-- ⬜ Unified score model: add `score` + per-mode `ScoreFor()` to `LevelResult.cs` `P0`
-- ⬜ `LeaderboardEntry` + `LeaderboardStore` (JSON via Newtonsoft, PlayerPrefs fallback for WebGL) `P0`
-- ⬜ `LeaderboardRecorder` on GameManager → records on `LevelEnded` `P0`
-- ⬜ Capture player name (TMP_InputField, PlayerPrefs `PlayerName`) `P1`
-- ⬜ Real TITLE screen (panel in MainMenu shown first: logo + "press/tap to start" + music hook) `P1`
-- ⬜ `LeaderboardUI` panel + mode tabs + Leaderboard button on main menu `P1`
+- ✅ Unified score model: `score` + per-mode `ScoreFor()` in `LevelResult.cs`
+- ✅ `LeaderboardEntry` + `LeaderboardStore` (JSON via Newtonsoft → PlayerPrefs, cross-platform incl. WebGL)
+- ✅ Recording on `LevelEnded` (in `GameManager`, player-runs only) + player-name get/set in store
+- ⬜ Capture player name UI (TMP_InputField → `LeaderboardStore.SetPlayerName`) `P1` 🧑 *(needs scene)*
+- ⬜ Real TITLE screen (panel in MainMenu: logo + "press/tap to start" + music hook) `P1` 🧑 *(needs scene)*
+- ⬜ `LeaderboardUI` panel + mode tabs + Leaderboard button on main menu `P1` 🧑 *(needs scene)*
 - ⬜ "View Leaderboard" / "New best!" on EndScreen `P2`
 - 🧑 Wire new SerializeField refs in `MainMenu.unity` (binary scene — in-editor) `P1`
 - 🧑 *Optional* global leaderboard: Vercel serverless (`/api/scores`) + KV/Upstash + `GlobalLeaderboardClient` w/ offline fallback `P2`
