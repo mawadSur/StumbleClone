@@ -37,13 +37,13 @@ namespace StumbleClone.UI
         private void Start()
         {
             _overlay = RuntimeUI.Overlay("TitleOverlay", 100);
-            var bg = RuntimeUI.Panel(_overlay.transform, "Bg", new Color(0.06f, 0.07f, 0.12f, 1f),
+            var bg = RuntimeUI.Panel(_overlay.transform, "Bg", UITheme.SurfaceDeep,
                 Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
             var title = RuntimeUI.Label(bg.transform, "STUMBLE CLONE", 120,
                 new Vector2(0.5f, 0.82f), Vector2.zero, new Vector2(1500f, 200f));
             title.fontStyle = FontStyles.Bold;
-            title.color = new Color(1f, 0.85f, 0.2f);
+            title.color = UITheme.Gold;
 
             RuntimeUI.Label(bg.transform, "Knockout party arena — last one standing wins", 38,
                 new Vector2(0.5f, 0.71f), Vector2.zero, new Vector2(1400f, 80f));
@@ -56,15 +56,18 @@ namespace StumbleClone.UI
 
             // Bot difficulty — tap to cycle Easy / Normal / Hard. Persisted for every round.
             var diffBtn = RuntimeUI.Button(bg.transform, "BOTS: " + BotDifficulty.Label,
-                new Color(0.42f, 0.36f, 0.2f),
+                UITheme.Neutral,
                 new Vector2(0.5f, 0.42f), Vector2.zero, new Vector2(460f, 70f), OnCycleDifficulty);
             _difficultyLabel = diffBtn.GetComponentInChildren<TMP_Text>();
 
             // PLAY drops straight into the deathmatch (the focused mode) — no second menu.
-            RuntimeUI.Button(bg.transform, "PLAY", new Color(0.2f, 0.55f, 0.3f),
+            // Single primary CTA (pink); leaderboard is the subordinate secondary action (purple).
+            RuntimeUI.Button(bg.transform, "PLAY", UITheme.Primary,
                 new Vector2(0.5f, 0.28f), Vector2.zero, new Vector2(440f, 96f), OnPlay);
-            RuntimeUI.Button(bg.transform, "LEADERBOARD", new Color(0.2f, 0.3f, 0.55f),
+            RuntimeUI.Button(bg.transform, "LEADERBOARD", UITheme.Secondary,
                 new Vector2(0.5f, 0.14f), Vector2.zero, new Vector2(440f, 68f), OnLeaderboard);
+
+            OverlayIntro.Play(_overlay);
         }
 
         private void OnCycleDifficulty()

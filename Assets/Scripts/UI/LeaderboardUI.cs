@@ -45,6 +45,7 @@ namespace StumbleClone.UI
             if (_panel == null) Build();
             _panel.SetActive(true);
             Refresh();
+            OverlayIntro.Play(_panel);
         }
 
         private void Close()
@@ -55,17 +56,20 @@ namespace StumbleClone.UI
         private void Build()
         {
             _panel = RuntimeUI.Overlay("LeaderboardPanel", 110);
-            var bg = RuntimeUI.Panel(_panel.transform, "Bg", new Color(0.06f, 0.07f, 0.12f, 0.97f),
+            var bg = RuntimeUI.Panel(_panel.transform, "Bg",
+                new Color(UITheme.SurfaceDeep.r, UITheme.SurfaceDeep.g, UITheme.SurfaceDeep.b, 0.97f),
                 Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
-            RuntimeUI.Label(bg.transform, "LEADERBOARD", 72,
-                new Vector2(0.5f, 0.92f), Vector2.zero, new Vector2(900f, 110f)).fontStyle = FontStyles.Bold;
+            var heading = RuntimeUI.Label(bg.transform, "LEADERBOARD", 72,
+                new Vector2(0.5f, 0.92f), Vector2.zero, new Vector2(900f, 110f));
+            heading.fontStyle = FontStyles.Bold;
+            heading.color = UITheme.Gold;
 
-            RuntimeUI.Button(bg.transform, "Race", new Color(0.25f, 0.3f, 0.42f),
+            RuntimeUI.Button(bg.transform, "Race", UITheme.Neutral,
                 new Vector2(0.5f, 0.82f), new Vector2(-300f, 0f), new Vector2(260f, 64f), () => SetMode(LevelMode.Race));
-            RuntimeUI.Button(bg.transform, "Survival", new Color(0.25f, 0.3f, 0.42f),
+            RuntimeUI.Button(bg.transform, "Survival", UITheme.Neutral,
                 new Vector2(0.5f, 0.82f), new Vector2(0f, 0f), new Vector2(260f, 64f), () => SetMode(LevelMode.Survival));
-            RuntimeUI.Button(bg.transform, "Knockout", new Color(0.25f, 0.3f, 0.42f),
+            RuntimeUI.Button(bg.transform, "Knockout", UITheme.Neutral,
                 new Vector2(0.5f, 0.82f), new Vector2(300f, 0f), new Vector2(260f, 64f), () => SetMode(LevelMode.LastStanding));
 
             _tabLabel = RuntimeUI.Label(bg.transform, "", 40, new Vector2(0.5f, 0.74f), Vector2.zero, new Vector2(900f, 60f));
@@ -73,7 +77,7 @@ namespace StumbleClone.UI
             _listText = RuntimeUI.Label(bg.transform, "", 36, new Vector2(0.5f, 0.42f), Vector2.zero, new Vector2(1000f, 560f));
             _listText.alignment = TextAlignmentOptions.Top;
 
-            RuntimeUI.Button(bg.transform, "Back", new Color(0.5f, 0.2f, 0.2f),
+            RuntimeUI.Button(bg.transform, "Back", UITheme.Neutral,
                 new Vector2(0.5f, 0.08f), Vector2.zero, new Vector2(300f, 80f), Close);
         }
 

@@ -60,7 +60,8 @@ namespace StumbleClone.UI
             tmp.text = text;
             tmp.fontSize = fontSize;
             tmp.alignment = align;
-            tmp.color = Color.white;
+            tmp.color = UITheme.OnSurface;
+            UITheme.ApplyFont(tmp);
             return tmp;
         }
 
@@ -76,10 +77,17 @@ namespace StumbleClone.UI
 
             var img = go.AddComponent<Image>();
             img.color = color;
-            var btn = go.AddComponent<Button>();
-            if (onClick != null) btn.onClick.AddListener(onClick);
+            img.sprite = UITheme.RoundedSprite();   // chunky rounded corners
+            img.type = Image.Type.Sliced;
 
-            Label(go.transform, label, 30, new Vector2(0.5f, 0.5f), Vector2.zero, size);
+            var btn = go.AddComponent<Button>();
+            btn.transition = Selectable.Transition.None; // ButtonFeedback drives the visuals
+            if (onClick != null) btn.onClick.AddListener(onClick);
+            go.AddComponent<ButtonFeedback>().Init(img); // press scale + hover lift
+
+            var lbl = Label(go.transform, label, 32, new Vector2(0.5f, 0.5f), Vector2.zero, size);
+            lbl.fontStyle = FontStyles.Bold;
+            lbl.color = Color.white;
             return btn;
         }
 
@@ -96,6 +104,8 @@ namespace StumbleClone.UI
 
             var bg = go.AddComponent<Image>();
             bg.color = new Color(1f, 1f, 1f, 0.92f);
+            bg.sprite = UITheme.RoundedSprite();
+            bg.type = Image.Type.Sliced;
             var input = go.AddComponent<TMP_InputField>();
 
             var area = new GameObject("TextArea", typeof(RectTransform));
@@ -129,6 +139,7 @@ namespace StumbleClone.UI
             tmp.color = color;
             tmp.fontSize = 32f;
             tmp.alignment = TextAlignmentOptions.Left;
+            UITheme.ApplyFont(tmp);
             return tmp;
         }
     }

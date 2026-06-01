@@ -106,7 +106,9 @@ namespace StumbleClone.EditorTools
             PlayerSettings.WebGL.decompressionFallback = true;
             PlayerSettings.WebGL.dataCaching = true;
             PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly;
-            PlayerSettings.WebGL.template = "APPLICATION:Default";
+            // Branded, responsive wrapper (Assets/WebGLTemplates/StumbleClone) — emitted on every
+            // build, so the deployed web/ chrome stays on-brand without manual post-build edits.
+            PlayerSettings.WebGL.template = "PROJECT:StumbleClone";
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.WebGL, ScriptingImplementation.IL2CPP);
         }
 

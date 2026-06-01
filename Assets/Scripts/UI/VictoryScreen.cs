@@ -103,7 +103,7 @@ namespace StumbleClone.UI
             var title = RuntimeUI.Label(_overlay.transform, "VICTORY!", 130,
                 new Vector2(0.5f, 0.88f), Vector2.zero, new Vector2(1400f, 200f));
             title.fontStyle = FontStyles.Bold;
-            title.color = new Color(1f, 0.85f, 0.2f);
+            title.color = UITheme.Gold;
 
             LevelMode mode = Mode();
             string me = LeaderboardStore.GetPlayerName();
@@ -135,10 +135,12 @@ namespace StumbleClone.UI
                 new Vector2(0.5f, 0.45f), Vector2.zero, new Vector2(1000f, 540f));
             list.richText = true;
 
-            RuntimeUI.Button(_overlay.transform, "PLAY AGAIN", new Color(0.2f, 0.55f, 0.3f),
+            RuntimeUI.Button(_overlay.transform, "PLAY AGAIN", UITheme.Primary,
                 new Vector2(0.5f, 0.12f), new Vector2(-240f, 0f), new Vector2(440f, 92f), OnPlayAgain);
-            RuntimeUI.Button(_overlay.transform, "MAIN MENU", new Color(0.5f, 0.2f, 0.2f),
+            RuntimeUI.Button(_overlay.transform, "MAIN MENU", UITheme.Neutral,
                 new Vector2(0.5f, 0.12f), new Vector2(240f, 0f), new Vector2(440f, 92f), OnMenu);
+
+            OverlayIntro.Play(_overlay);
         }
 
         private static string Trunc(string s, int n)
