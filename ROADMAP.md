@@ -107,9 +107,9 @@ nothing plays. Avatars unbound (`m_Avatar:0`); controller motions are dangling r
 - ✅ First headless **WebGL** build SUCCEEDED (22 MB, `Builds/WebGL/index.html`) — 2026-05-31
 - ✅ **DEPLOYED LIVE to Vercel: https://stumbleclone.vercel.app** (HTTP 200, public) via `vercel deploy --prod`
 - ⬜ Persist build-ready PlayerSettings for mobile (`ConfigureAllPlatforms`) `P1`
-- 🟡 Verify mobile touch overlay on device/browser (code path fully wired) `P1` 🧑
-- ⬜ First headless **Android** APK/AAB build (needs Android module + NDK) `P1`
-- 🧑 Android release keystore (signing) `P1`
+- ✅ First headless **Android** build SUCCEEDED — `Builds/Android/StumbleClone.apk` (41.6 MB, IL2CPP ARM64) — 2026-05-31
+- 🟡 Verify mobile touch overlay on device (install the APK + play) `P1` 🧑
+- 🧑 Android release keystore + AAB for Play Store (debug-signed APK works for sideload testing now) `P1`
 - 🧑 App icons (1024² master) + branded splash (Unity Personal keeps watermark) `P1`
 - 🧑 **iOS** Xcode project → sign/provision on a Mac + Apple Developer account `P2`
 - ⬜ Reconcile PlatformBuilder vs ProjectSettings drift (minSdk 24/25, iOS 13/15, empty iOS usage strings) `P2`
