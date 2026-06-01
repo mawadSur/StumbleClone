@@ -15,9 +15,12 @@ name: Build WebGL & Deploy to Vercel
 # Until those secrets exist the workflow will fail at the Unity activation step — that's
 # expected; the rest of the game works without it. See ROADMAP.md EPIC 7.
 
+# NOTE: Auto-deploy on push is handled by Vercel's native Git integration (it serves the
+# committed web/ folder — see vercel.json outputDirectory). THIS workflow is the optional
+# "rebuild WebGL from source in CI" path; it's manual-only (workflow_dispatch) until you add
+# the UNITY_LICENSE + VERCEL_* secrets, so it doesn't fail on every push. Switch it back to
+# `push: [main]` once those secrets exist if you want CI to rebuild from source on each push.
 on:
-  push:
-    branches: [main]
   workflow_dispatch: {}
 
 concurrency:

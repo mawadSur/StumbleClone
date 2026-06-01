@@ -1,27 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "comment": "Copied into the built WebGL folder by .github/workflows/deploy-web.yml before deploy. Serves Unity's pre-gzipped Build/* files with the right Content-Encoding/Content-Type so the browser decompresses natively (decompressionFallback also on as a safety net).",
-  "headers": [
-    {
-      "source": "/Build/(.*)\\.wasm\\.gz",
-      "headers": [
-        { "key": "Content-Encoding", "value": "gzip" },
-        { "key": "Content-Type", "value": "application/wasm" }
-      ]
-    },
-    {
-      "source": "/Build/(.*)\\.js\\.gz",
-      "headers": [
-        { "key": "Content-Encoding", "value": "gzip" },
-        { "key": "Content-Type", "value": "application/javascript" }
-      ]
-    },
-    {
-      "source": "/Build/(.*)\\.(data|symbols\\.json)\\.gz",
-      "headers": [
-        { "key": "Content-Encoding", "value": "gzip" },
-        { "key": "Content-Type", "value": "application/octet-stream" }
-      ]
-    }
-  ]
+  "outputDirectory": "web",
+  "framework": null,
+  "buildCommand": null,
+  "installCommand": null
 }

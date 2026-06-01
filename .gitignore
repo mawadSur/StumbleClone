@@ -72,3 +72,6 @@ node_modules/
 memory/
 *.db
 *.sqlite
+
+# keep the hosted APK for the web auto-deploy
+!web/StumbleClone-android.apk
