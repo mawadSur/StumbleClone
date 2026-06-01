@@ -104,8 +104,9 @@ nothing plays. Avatars unbound (`m_Avatar:0`); controller motions are dangling r
 
 ## EPIC 6 — Build & Publish (iOS / Android / Web) — `PlatformBuilder` exists, never run
 
-- ⬜ Persist build-ready PlayerSettings (run `ConfigureAllPlatforms` once; commit landscape + bundle id + IL2CPP) `P0`
-- ⬜ First headless **WebGL** build succeeds (verify `Builds/WebGL/index.html`; needs WebGL module) `P0`
+- ✅ First headless **WebGL** build SUCCEEDED (22 MB, `Builds/WebGL/index.html`) — 2026-05-31
+- ✅ **DEPLOYED LIVE to Vercel: https://stumbleclone.vercel.app** (HTTP 200, public) via `vercel deploy --prod`
+- ⬜ Persist build-ready PlayerSettings for mobile (`ConfigureAllPlatforms`) `P1`
 - 🟡 Verify mobile touch overlay on device/browser (code path fully wired) `P1` 🧑
 - ⬜ First headless **Android** APK/AAB build (needs Android module + NDK) `P1`
 - 🧑 Android release keystore (signing) `P1`
@@ -123,8 +124,12 @@ nothing plays. Avatars unbound (`m_Avatar:0`); controller motions are dangling r
 - ✅ Created **public** GitHub repo under `mawadSur` + pushed → https://github.com/mawadSur/StumbleClone
 - ✅ `vercel.json` — gzip WebGL `Content-Encoding`/`Content-Type` headers
 - ✅ GitHub Actions `deploy-web.yml`: `game-ci/unity-builder` (WebGL) → deploy to Vercel on push to main
-- 🧑 **Add repo secrets** (Settings → Secrets → Actions): `UNITY_LICENSE`/`UNITY_EMAIL`/`UNITY_PASSWORD` + `VERCEL_TOKEN`/`VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` — until then CI fails at Unity activation `P0`
-- ⬜ End-to-end verify: push → CI builds → Vercel URL loads the game `P1`
+- ✅ **Live production deploy: https://stumbleclone.vercel.app** (manual `vercel deploy`, project `stumbleclone` under mawadsur)
+- 🧑 **For AUTO-deploy on push**, add repo secrets (Settings → Secrets → Actions). I have 2 ready for you:
+  - `VERCEL_ORG_ID` = `team_dBnwdDkq7Sc8mDm0dmKyRJhP`
+  - `VERCEL_PROJECT_ID` = `prj_QnCvznIvedkcmkhluoMBbABWX9d3`
+  - `VERCEL_TOKEN` (vercel.com/account/tokens) + `UNITY_LICENSE`/`UNITY_EMAIL`/`UNITY_PASSWORD` (yours)
+- ⬜ End-to-end verify: push → CI builds → Vercel URL updates `P1`
 
 ---
 
