@@ -61,19 +61,20 @@ namespace StumbleClone.Bots
 
                 bot.racerId = firstRacerId + i;
                 bot.displayName = BotNameGenerator.GetUnique();
-                bot.behavior = CreateBehavior(mode);
 
-                // Per-bot skill variation so the field isn't a uniform blob — vary move speed
-                // ±~13% around the default. (Agent is cached in BotController.Awake during Instantiate.)
+                // Per-bot skill (0.35..1) drives both move speed and behavior aggression/reaction
+                // so the 7 bots feel distinct and finishing order is earned, not arbitrary.
+                float skill = Random.Range(0.35f, 1f);
+                bot.behavior = CreateBehavior(mode, skill);
                 if (bot.Agent != null)
-                    bot.Agent.speed = GameConstants.DefaultMoveSpeed * Random.Range(0.85f, 1.13f);
+                    bot.Agent.speed = GameConstants.DefaultMoveSpeed * Mathf.Lerp(0.85f, 1.15f, skill);
 
                 go.name = "Bot_" + bot.displayName;
                 spawned++;
             }
         }
 
-        private BotBehavior CreateBehavior(LevelMode m)
+        private BotBehavior CreateBehavior(LevelMode m, float skill)
         {
             switch (m)
             {
@@ -82,7 +83,7 @@ namespace StumbleClone.Bots
                 case LevelMode.Survival:
                     return new SurvivalBotBehavior(safeAnchor);
                 case LevelMode.LastStanding:
-                    return new LastStandBotBehavior(arenaCenter, arenaRadius);
+                    return new LastStandBotBehavior(arenaCenter, arenaRadius, skill: skill);
                 default:
                     return new RaceBotBehavior(finishLine);
             }

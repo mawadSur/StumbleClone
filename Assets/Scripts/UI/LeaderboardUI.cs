@@ -11,6 +11,8 @@ namespace StumbleClone.UI
     /// read from LeaderboardStore. Self-instantiates on MainMenu load — no scene wiring/rebuild.
     public sealed class LeaderboardUI : MonoBehaviour
     {
+        public static LeaderboardUI Instance { get; private set; }
+
         private const string MenuScene = "MainMenu";
         private GameObject _panel;
         private TMP_Text _listText;
@@ -35,14 +37,10 @@ namespace StumbleClone.UI
             new GameObject("LeaderboardUI").AddComponent<LeaderboardUI>();
         }
 
-        private void Start()
-        {
-            var btnCanvas = RuntimeUI.Overlay("LeaderboardButton", 20);
-            RuntimeUI.Button(btnCanvas.transform, "LEADERBOARD", new Color(0.2f, 0.3f, 0.55f),
-                new Vector2(0f, 0f), new Vector2(160f, 60f), new Vector2(280f, 72f), Open);
-        }
+        private void Awake() => Instance = this;
+        private void OnDestroy() { if (Instance == this) Instance = null; }
 
-        private void Open()
+        public void Open()
         {
             if (_panel == null) Build();
             _panel.SetActive(true);

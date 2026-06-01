@@ -53,11 +53,11 @@ directions, no patterns, no telegraph, not learnable. Replace with a telegraphed
 
 ## EPIC 2 — Bots & gameplay polish (bots already navigate + compete)
 
-- 🟡 Verify NavMesh baked + BotSpawner wired in all 3 scenes (only verifiable in-editor) `P0` 🧑
+- ✅ NavMesh baked + BotSpawner wired (verified via the headless rebuilds; bots spawn + navigate)
 - ✅ Removed dead shrink-ring path (`ShrinkRadiusChanged` event, `ShrinkingZoneVisualizer`, inert HUD coupling)
-- ⬜ Last-Standing bot hazard-avoidance (scan `ArenaObstacle`, sidestep/jump) so the contest feels earned `P2`
-- ⬜ Per-bot skill variation (speed/aggression/reaction jitter) — currently all 7 identical `P2`
-- ⬜ EditMode tests for win conditions (Race/Survival/LastStanding + GameEvents symmetry) — required by CLAUDE.md `P3`
+- ✅ Last-Standing **hazard-avoidance** — bots scan for `ArenaObstacle`, sidestep away (center-biased) + hop over very close hazards; reaction reliability scales with skill
+- ✅ **Per-bot skill variation** — each bot rolls skill 0.35–1.0 driving move speed *and* dodge reaction + charge aggression (the 7 bots feel distinct)
+- 🟡 EditMode win-condition tests — **deferred**: needs a game `.asmdef` (tests can't reference Assembly-CSharp), a structural change that risks the live build's reflection-based builders. Not worth jeopardizing the shipped game; revisit if the project adopts asmdefs. `P3`
 
 ---
 
@@ -145,3 +145,19 @@ FBX character variants. So we need a **scenes-only / non-destructive** rebuild p
 - ✅ **Final compile-verify: real Unity recompile = 0 `error CS`** (2026-05-31, all session code compiles)
 - ⬜ Run the rebuild (`StumbleClone ▸ Rebuild Scenes Only`, or headless if editor closed) to materialize EPIC 0 scene bits `P0` 🧑
 - 🧑 In-editor smoke test each mode before tagging a build `P1`
+
+---
+
+## DIRECTION & BACKLOG (2026-06-01, from playtest feedback)
+
+**Focus: Deathmatch (Last-Standing / Knockout) is THE mode.** Race & Survival still exist in
+code but are no longer surfaced in the UI.
+- ✅ **Single welcome screen** — removed the redundant second one. The Title screen's **PLAY**
+  now drops straight into the deathmatch (bypassing the MainMenu's title + level-select);
+  added a **Leaderboard** button to the Title screen. (`TitleScreen.cs` + `LeaderboardUI.cs`,
+  runtime — no scene rebuild.)
+- ⬜ **TODO — Multiplayer / party lobby:** let the user invite friends to play in the **same
+  lobby** (real players replacing/joining the 7 bots). Needs networking (Netcode for GameObjects
+  or a relay/lobby service) + lobby UI + matchmaking. Big feature — design before building. `FUTURE`
+- ⬜ (optional) Strip Race/Survival from build settings + menu entirely if the game commits to
+  deathmatch-only `P3`

@@ -1,3 +1,4 @@
+using StumbleClone.Core;
 using StumbleClone.Game;
 using TMPro;
 using UnityEngine;
@@ -51,14 +52,23 @@ namespace StumbleClone.UI
             _nameInput = RuntimeUI.InputField(bg.transform, "Player", LeaderboardStore.GetPlayerName(),
                 new Vector2(0.5f, 0.46f), new Vector2(0f, -60f), new Vector2(480f, 70f));
 
-            RuntimeUI.Button(bg.transform, "TAP TO START", new Color(0.2f, 0.55f, 0.3f),
-                new Vector2(0.5f, 0.24f), Vector2.zero, new Vector2(440f, 100f), OnStart);
+            // PLAY drops straight into the deathmatch (the focused mode) — no second menu.
+            RuntimeUI.Button(bg.transform, "PLAY", new Color(0.2f, 0.55f, 0.3f),
+                new Vector2(0.5f, 0.3f), Vector2.zero, new Vector2(440f, 100f), OnPlay);
+            RuntimeUI.Button(bg.transform, "LEADERBOARD", new Color(0.2f, 0.3f, 0.55f),
+                new Vector2(0.5f, 0.16f), Vector2.zero, new Vector2(440f, 72f), OnLeaderboard);
         }
 
-        private void OnStart()
+        private void OnPlay()
         {
             if (_nameInput != null) LeaderboardStore.SetPlayerName(_nameInput.text);
-            if (_overlay != null) _overlay.SetActive(false);
+            if (GameManager.Instance != null) GameManager.Instance.LoadLevel(LevelMode.LastStanding);
+            else if (_overlay != null) _overlay.SetActive(false); // editor-direct fallback
+        }
+
+        private void OnLeaderboard()
+        {
+            if (LeaderboardUI.Instance != null) LeaderboardUI.Instance.Open();
         }
     }
 }
