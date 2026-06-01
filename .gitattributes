@@ -1,0 +1,30 @@
+# Normalize text to LF; let git auto-detect.
+* text=auto eol=lf
+*.cs   text eol=lf diff=csharp
+*.md   text eol=lf
+*.json text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+
+# This project serializes assets as BINARY (EditorSettings m_SerializationMode: 2),
+# so scenes/prefabs/etc. must be treated as binary — never line-ending-normalized or
+# text-merged, which would corrupt them.
+*.unity      binary
+*.prefab     binary
+*.asset      binary
+*.mat        binary
+*.anim       binary
+*.controller binary
+*.physicMaterial binary
+
+# Art / audio binaries
+*.fbx  binary
+*.png  binary
+*.jpg  binary
+*.psd  binary
+*.tga  binary
+*.wav  binary
+*.mp3  binary
+*.ogg  binary
+*.ttf  binary
+*.otf  binary

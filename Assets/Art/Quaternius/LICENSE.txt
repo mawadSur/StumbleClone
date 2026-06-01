@@ -1,0 +1,14 @@
+Quaternius Game Assets
+======================
+
+Source: https://quaternius.com/
+License: CC0 1.0 Universal (Public Domain Dedication)
+         https://creativecommons.org/publicdomain/zero/1.0/
+
+These models are free to use in personal and commercial projects.
+No attribution is required, but crediting Quaternius is appreciated.
+
+Packs used in this project:
+- Ultimate Animated Character Pack (Characters/)
+- Ultimate Platformer Pack         (Platformer/)
+- Ultimate Stylized Nature Pack    (Nature/)

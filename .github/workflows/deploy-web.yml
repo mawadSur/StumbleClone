@@ -1,0 +1,100 @@
+name: Build WebGL & Deploy to Vercel
+
+# Auto-builds the Unity WebGL player and deploys it to Vercel on every push to main.
+#
+# REQUIRED GitHub repo secrets (Settings → Secrets and variables → Actions):
+#   UNITY_LICENSE   — contents of your Unity .ulf license file (Personal is fine).
+#                     Generate via the game-ci activation flow:
+#                     https://game.ci/docs/github/activation
+#   UNITY_EMAIL     — your Unity account email
+#   UNITY_PASSWORD  — your Unity account password
+#   VERCEL_TOKEN    — https://vercel.com/account/tokens
+#   VERCEL_ORG_ID   — from `vercel link` (.vercel/project.json) or the Vercel dashboard
+#   VERCEL_PROJECT_ID
+#
+# Until those secrets exist the workflow will fail at the Unity activation step — that's
+# expected; the rest of the game works without it. See ROADMAP.md EPIC 7.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: web-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-webgl:
+    name: Build WebGL
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-WebGL-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-WebGL-
+            Library-
+
+      - name: Build (game-ci)
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.4.8f1
+          targetPlatform: WebGL
+          allowDirtyBuild: true
+
+      - name: Upload WebGL artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WebGL
+          path: build/WebGL
+          retention-days: 7
+
+  deploy-vercel:
+    name: Deploy to Vercel
+    needs: build-webgl
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (for vercel.json)
+        uses: actions/checkout@v4
+
+      - name: Download WebGL build
+        uses: actions/download-artifact@v4
+        with:
+          name: WebGL
+          path: build/WebGL
+
+      - name: Locate the player folder (handles game-ci output nesting)
+        id: locate
+        run: |
+          INDEX=$(find build/WebGL -name index.html | head -1)
+          if [ -z "$INDEX" ]; then echo "No index.html in WebGL build" >&2; exit 1; fi
+          DIR=$(dirname "$INDEX")
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+          cp vercel.json "$DIR/vercel.json"
+          echo "Deploying: $DIR"; ls -la "$DIR"
+
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
+
+      - name: Deploy to Vercel (production)
+        working-directory: ${{ steps.locate.outputs.dir }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          vercel deploy --prod --yes --token="$VERCEL_TOKEN" \
+            --archive=tgz > deployment-url.txt
+          echo "Deployed to: $(cat deployment-url.txt)"

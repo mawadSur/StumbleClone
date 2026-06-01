@@ -1,0 +1,74 @@
+# ============================================================
+# Unity — generated folders (never commit; multi-GB, machine-local)
+# ============================================================
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# Asset meta files MUST be committed alongside their asset — only ignored if the asset is.
+!/[Aa]ssets/**/*.meta
+
+# Unity crash / generated
+sysinfo.txt
+crashlytics-build.properties
+*.unitypackage
+
+# Build artifacts
+*.apk
+*.aab
+*.app
+*.ipa
+
+# ============================================================
+# IDE / tooling
+# ============================================================
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.booproj
+*.svd
+*.pdb
+*.opendb
+*.VC.db
+*.DotSettings.user
+
+# ============================================================
+# OS
+# ============================================================
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+
+# ============================================================
+# Web / Vercel tooling (for /api serverless + deploy)
+# ============================================================
+node_modules/
+.vercel
+*.log
+
+# Visual Studio new-style solution
+*.slnx
+
+# Ruflo / claude-flow runtime + generated agent state (not project source)
+.claude-flow/
+.swarm/
+.hive-mind/
+.claude/agent-memory/
+.claude/.runtime/
+memory/
+*.db
+*.sqlite
