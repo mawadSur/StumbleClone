@@ -103,6 +103,9 @@ namespace StumbleClone.UI.Mobile
             _root.AddComponent<GraphicRaycaster>();
 
             BuildJoystick(_root.transform);
+            // Right-half drag-to-look pad (camera). Created BEFORE the action buttons so the
+            // buttons sit on top and intercept their own taps; drags elsewhere rotate the camera.
+            BuildLookPad(_root.transform);
             BuildButton(_root.transform, "JumpButton", "JUMP", "<Gamepad>/buttonSouth",
                 anchor: new Vector2(1f, 0f), anchoredPos: new Vector2(-220f, 200f),
                 size: 230f, color: new Color(0.20f, 0.65f, 0.95f, 0.55f));
@@ -112,6 +115,31 @@ namespace StumbleClone.UI.Mobile
             BuildButton(_root.transform, "PauseButton", "II", "<Gamepad>/start",
                 anchor: new Vector2(1f, 1f), anchoredPos: new Vector2(-90f, -90f),
                 size: 110f, color: new Color(0.1f, 0.1f, 0.1f, 0.45f));
+        }
+
+        // A near-invisible Image covering the right half of the screen. The OnScreenStick lives
+        // on it with a DYNAMIC ORIGIN, so a touch anywhere in the area becomes the look origin and
+        // dragging steers the third-person camera (feeds <Gamepad>/rightStick -> the Look action,
+        // which ThirdPersonCamera consumes). It's added first, so the JUMP/PUSH/PAUSE buttons
+        // (added afterwards) render on top and swallow their own touches.
+        private void BuildLookPad(Transform parent)
+        {
+            var go = new GameObject("LookPad", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            var rt = (RectTransform)go.transform;
+            rt.SetParent(parent, false);
+            rt.anchorMin = new Vector2(0.5f, 0f); // right half of the screen
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+
+            var img = go.GetComponent<Image>();
+            img.color = new Color(0f, 0f, 0f, 0.001f); // effectively invisible, still raycastable
+            img.raycastTarget = true;
+
+            var stick = go.AddComponent<TouchOnScreenStick>();
+            stick.movementRange = 120f; // ~120px drag = full look speed
+            stick.SetBehaviour(OnScreenStick.Behaviour.ExactPositionWithDynamicOrigin);
+            stick.SetControlPath("<Gamepad>/rightStick");
         }
 
         private void BuildJoystick(Transform parent)

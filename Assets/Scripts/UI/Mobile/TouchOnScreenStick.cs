@@ -12,5 +12,8 @@ namespace StumbleClone.UI.Mobile
     public sealed class TouchOnScreenStick : OnScreenStick
     {
         public void SetControlPath(string path) => controlPathInternal = path;
+
+        /// Surface the stick behaviour (e.g. dynamic origin for a drag-anywhere look pad).
+        public void SetBehaviour(Behaviour b) => behaviour = b;
     }
 }
