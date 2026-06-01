@@ -47,6 +47,13 @@ namespace StumbleClone.UI
 
         private void HandleLevelEnded(IRacer winner)
         {
+            // On a human win, VictoryScreen takes over (dance + leaderboard) — stay hidden.
+            if (winner != null && winner.IsPlayer)
+            {
+                if (panel != null) panel.SetActive(false);
+                return;
+            }
+
             if (panel != null) panel.SetActive(true);
 
             int totalRacers = RacerRegistry.All.Count;

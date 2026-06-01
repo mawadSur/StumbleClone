@@ -20,6 +20,7 @@ namespace StumbleClone.Animation
         private const float JumpDur = 0.35f;
         private const float KnockDur = 1.3f;
         private const float DashDur = 0.28f;
+        private const float PushDur = 0.25f;
 
         private Vector3 _basePos;
         private Quaternion _baseRot;
@@ -31,6 +32,8 @@ namespace StumbleClone.Animation
         private float _jumpTimer;
         private float _knockTimer;
         private float _dashTimer;
+        private float _pushTimer;
+        private bool _victory;
 
         /// Point the animator at the mesh root to animate (usually the Animator's own transform).
         public void SetVisual(Transform t)
@@ -76,10 +79,28 @@ namespace StumbleClone.Animation
 
         public void NotifyDash() => _dashTimer = DashDur;
 
+        public void NotifyPush() => _pushTimer = PushDur;
+
+        /// Looping celebration (hop + twirl) held while true — used by the victory screen.
+        public void SetVictory(bool v) => _victory = v;
+
         private void LateUpdate()
         {
             if (visual == null || !_captured) return;
             float dt = Time.deltaTime;
+
+            // ---- Victory dance: bouncing twirl, held until cleared ------------------
+            if (_victory)
+            {
+                float vt = Time.time;
+                float hop = Mathf.Abs(Mathf.Sin(vt * 5f)) * 0.35f;
+                float spin = vt * 220f;                          // continuous celebratory twirl
+                float pulse = 1f + Mathf.Sin(vt * 10f) * 0.05f;
+                visual.localPosition = _basePos + Vector3.up * hop;
+                visual.localRotation = _baseRot * Quaternion.Euler(-8f * Mathf.Sin(vt * 5f), spin, 6f * Mathf.Sin(vt * 10f));
+                visual.localScale = new Vector3(_baseScale.x, _baseScale.y * pulse, _baseScale.z);
+                return;
+            }
 
             // ---- Knockdown: topple over, lie a beat, get back up -------------------
             if (_knockTimer > 0f)
@@ -122,13 +143,24 @@ namespace StumbleClone.Animation
                 dashLower = 0.30f * s;         // drop toward the ground
             }
 
+            // ---- Push: quick forward shove (lean in, small pop) -------------------
+            float pushLean = 0f, pushPop = 0f;
+            if (_pushTimer > 0f)
+            {
+                _pushTimer -= dt;
+                float p = 1f - Mathf.Clamp01(_pushTimer / PushDur); // 0→1
+                float s = Mathf.Sin(p * Mathf.PI);                  // 0→1→0
+                pushLean = 30f * s;   // thrust forward
+                pushPop = 0.05f * s;
+            }
+
             // ---- Locomotion: bob + lean + sway, idle breathing --------------------
             float bob = Mathf.Abs(Mathf.Sin(_phase)) * bobHeight * _speed01;
             float breath = (_speed01 < 0.05f) ? Mathf.Sin(Time.time * 2f) * idleBreath : 0f;
-            float lean = maxLeanDeg * _speed01 + dashLean;
+            float lean = maxLeanDeg * _speed01 + dashLean + pushLean;
             float sway = Mathf.Sin(_phase) * swayRollDeg * _speed01;
 
-            visual.localPosition = _basePos + Vector3.up * (bob + jumpPop - dashLower);
+            visual.localPosition = _basePos + Vector3.up * (bob + jumpPop - dashLower + pushPop);
             visual.localRotation = _baseRot * Quaternion.Euler(lean, 0f, sway);
             visual.localScale = new Vector3(
                 _baseScale.x * jumpSquashXZ,

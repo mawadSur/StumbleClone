@@ -23,6 +23,7 @@ namespace StumbleClone.Player
         private static readonly int HashDash = Animator.StringToHash("Dash");
 
         private const float DashLungeDur = 0.28f;
+        private const float PushDur = 0.25f;
 
         private bool _wasGrounded = true;
         private ProceduralCharacterAnimator _proc;
@@ -37,6 +38,8 @@ namespace StumbleClone.Player
         private Vector3 _visualBaseScale;
         private bool _visualCaptured;
         private float _dashLunge;
+        private float _pushTimer;
+        private bool _victory;
 
         private void Awake()
         {
@@ -88,29 +91,57 @@ namespace StumbleClone.Player
             _wasGrounded = grounded;
         }
 
-        // Applies the dash SLIDE after the Animator has written its pose for the frame: the
-        // character drops low, reclines back (feet-first) and stretches along travel.
+        // Overlays played on top of whatever clip the real Animator is running, after it writes
+        // its pose for the frame: looping victory dance (held), the dash slide, or a push thrust.
         private void LateUpdate()
         {
-            if (!_visualCaptured || _dashLunge <= 0f) return;
+            if (!_visualCaptured) return;
+            float dt = Time.deltaTime;
 
-            _dashLunge -= Time.deltaTime;
-            float d = Mathf.Clamp01(_dashLunge / DashLungeDur); // 1 -> 0 over the move
-            float s = Mathf.Sin(Mathf.Clamp01(d) * Mathf.PI);   // 0 -> 1 -> 0
-
-            _visual.localPosition = _visualBasePos - new Vector3(0f, 0.32f * s, 0f);
-            _visual.localRotation = _visualBaseRot * Quaternion.Euler(-38f * d, 0f, 0f);
-            _visual.localScale = new Vector3(
-                _visualBaseScale.x * (1f - 0.10f * s),
-                _visualBaseScale.y * (1f - 0.34f * s),
-                _visualBaseScale.z * (1f + 0.28f * s));
-
-            if (_dashLunge <= 0f) // restore exactly on the last frame
+            if (_victory) // bouncing twirl, held until cleared
             {
-                _visual.localPosition = _visualBasePos;
-                _visual.localRotation = _visualBaseRot;
-                _visual.localScale = _visualBaseScale;
+                float vt = Time.time;
+                float hop = Mathf.Abs(Mathf.Sin(vt * 5f)) * 0.35f;
+                float spin = vt * 220f;
+                float pulse = 1f + Mathf.Sin(vt * 10f) * 0.05f;
+                _visual.localPosition = _visualBasePos + Vector3.up * hop;
+                _visual.localRotation = _visualBaseRot * Quaternion.Euler(-8f * Mathf.Sin(vt * 5f), spin, 6f * Mathf.Sin(vt * 10f));
+                _visual.localScale = new Vector3(_visualBaseScale.x, _visualBaseScale.y * pulse, _visualBaseScale.z);
+                return;
             }
+
+            if (_dashLunge > 0f) // low feet-first slide
+            {
+                _dashLunge -= dt;
+                float d = Mathf.Clamp01(_dashLunge / DashLungeDur); // 1 -> 0
+                float s = Mathf.Sin(Mathf.Clamp01(d) * Mathf.PI);   // 0 -> 1 -> 0
+                _visual.localPosition = _visualBasePos - new Vector3(0f, 0.32f * s, 0f);
+                _visual.localRotation = _visualBaseRot * Quaternion.Euler(-38f * d, 0f, 0f);
+                _visual.localScale = new Vector3(
+                    _visualBaseScale.x * (1f - 0.10f * s),
+                    _visualBaseScale.y * (1f - 0.34f * s),
+                    _visualBaseScale.z * (1f + 0.28f * s));
+                if (_dashLunge <= 0f) RestoreBase();
+                return;
+            }
+
+            if (_pushTimer > 0f) // quick forward shove
+            {
+                _pushTimer -= dt;
+                float p = 1f - Mathf.Clamp01(_pushTimer / PushDur); // 0 -> 1
+                float s = Mathf.Sin(p * Mathf.PI);                  // 0 -> 1 -> 0
+                _visual.localPosition = _visualBasePos + Vector3.up * (0.05f * s);
+                _visual.localRotation = _visualBaseRot * Quaternion.Euler(28f * s, 0f, 0f);
+                _visual.localScale = _visualBaseScale;
+                if (_pushTimer <= 0f) RestoreBase();
+            }
+        }
+
+        private void RestoreBase()
+        {
+            _visual.localPosition = _visualBasePos;
+            _visual.localRotation = _visualBaseRot;
+            _visual.localScale = _visualBaseScale;
         }
 
         public void TriggerKnockedDown()
@@ -128,6 +159,20 @@ namespace StumbleClone.Player
             }
             if (_hasDashParam && animator != null) animator.SetTrigger(HashDash);
             _dashLunge = DashLungeDur; // procedural overlay — works with or without a Dash state
+        }
+
+        public void TriggerPush()
+        {
+            if (_proc != null) { _proc.NotifyPush(); return; }
+            _pushTimer = PushDur;
+        }
+
+        /// Start/stop the looping victory dance (used by the victory screen).
+        public void SetVictory(bool on)
+        {
+            if (_proc != null) { _proc.SetVictory(on); return; }
+            _victory = on;
+            if (!on && _visualCaptured) RestoreBase();
         }
 
         private static bool HasParam(Animator a, int nameHash)

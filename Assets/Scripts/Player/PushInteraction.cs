@@ -19,10 +19,13 @@ namespace StumbleClone.Player
         private readonly RaycastHit[] _hits = new RaycastHit[HitBufferSize];
         private float _nextPushTime;
 
+        private PlayerAnimator _animator;
+
         private void Awake()
         {
             if (input == null) input = GetComponent<PlayerInputHandler>();
             if (selfCollider == null) selfCollider = GetComponent<CapsuleCollider>();
+            _animator = GetComponent<PlayerAnimator>();
         }
 
         private void Update()
@@ -38,6 +41,7 @@ namespace StumbleClone.Player
         private void DoPush()
         {
             AudioManager.Play(Sfx.Push);
+            if (_animator != null) _animator.TriggerPush();
             GetCapsulePoints(out Vector3 p1, out Vector3 p2, out float radius);
             int count = Physics.CapsuleCastNonAlloc(p1, p2, radius, transform.forward,
                 _hits, pushRange, hitMask, QueryTriggerInteraction.Ignore);
