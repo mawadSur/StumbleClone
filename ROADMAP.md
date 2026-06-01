@@ -102,12 +102,13 @@ nothing plays. Avatars unbound (`m_Avatar:0`); controller motions are dangling r
 
 ---
 
-## EPIC 6 — Build & Publish (iOS / Android / Web) — `PlatformBuilder` exists, never run
+## EPIC 6 — Build & Publish (iOS / Android / Web) — **Web + Android SHIPPED; iOS needs a Mac**
 
 - ✅ First headless **WebGL** build SUCCEEDED (22 MB, `Builds/WebGL/index.html`) — 2026-05-31
 - ✅ **DEPLOYED LIVE to Vercel: https://stumbleclone.vercel.app** (HTTP 200, public) via `vercel deploy --prod`
 - ⬜ Persist build-ready PlayerSettings for mobile (`ConfigureAllPlatforms`) `P1`
 - ✅ First headless **Android** build SUCCEEDED — `Builds/Android/StumbleClone.apk` (41.6 MB, IL2CPP ARM64) — 2026-05-31
+- ✅ **APK hosted for phone install: https://stumbleclone.vercel.app/StumbleClone-android.apk** (HTTP 200, valid APK)
 - 🟡 Verify mobile touch overlay on device (install the APK + play) `P1` 🧑
 - 🧑 Android release keystore + AAB for Play Store (debug-signed APK works for sideload testing now) `P1`
 - 🧑 App icons (1024² master) + branded splash (Unity Personal keeps watermark) `P1`
