@@ -77,11 +77,12 @@ nothing plays. Avatars unbound (`m_Avatar:0`); controller motions are dangling r
 
 ## EPIC 4 — Audio ("sounds") — currently 100% absent (only an AudioListener)
 
-- ⬜ `Audio/AudioManager.cs` — DontDestroyOnLoad singleton, pooled one-shot SFX + music source + AudioMixer buses `P0`
-- ⬜ `Audio/SfxLibrary.cs` (ScriptableObject) + `GameAudioHooks.cs` wired to GameEvents (jump/land/push/hit/eliminate/finish) `P1`
-- ⬜ UI click SFX on menu/HUD buttons (reusable component via UIBootstrapper) `P1`
-- 🧑 Provide/approve actual SFX + music files (synth placeholders or CC0 packs) `P1`
-- ⬜ Audio settings panel (master/music/SFX sliders → PlayerPrefs) `P2`
+- ✅ `Audio/AudioManager.cs` — self-bootstrapping DontDestroyOnLoad singleton with pooled 2D SFX sources
+- ✅ `Audio/ProceduralSfx.cs` — synthesizes jump/land/push/hit/eliminate/win/start/click **in code (zero audio files)**
+- ✅ `Audio/GameAudioHooks.cs` — event-driven SFX (eliminate/win/start), re-subscribes across scene loads
+- ✅ Gameplay hooks: jump + hit in `PlayerController`, push whoosh in `PushInteraction`
+- ⬜ UI click SFX on menu/HUD buttons `P1` 🧑 *(needs scene/button refs)*
+- 🧑 Optionally replace synth placeholders with real SFX + music (CC0 packs) + AudioMixer sliders `P2`
 
 ---
 

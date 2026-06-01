@@ -1,3 +1,4 @@
+using StumbleClone.Audio;
 using StumbleClone.Core;
 using UnityEngine;
 
@@ -36,6 +37,7 @@ namespace StumbleClone.Player
 
         private void DoPush()
         {
+            AudioManager.Play(Sfx.Push);
             GetCapsulePoints(out Vector3 p1, out Vector3 p2, out float radius);
             int count = Physics.CapsuleCastNonAlloc(p1, p2, radius, transform.forward,
                 _hits, pushRange, hitMask, QueryTriggerInteraction.Ignore);

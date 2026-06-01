@@ -1,4 +1,5 @@
 using System;
+using StumbleClone.Audio;
 using StumbleClone.Core;
 using UnityEngine;
 
@@ -126,6 +127,7 @@ namespace StumbleClone.Player
                 Vector3 v = _rb.linearVelocity;
                 v.y = jumpSpeed;
                 _rb.linearVelocity = v;
+                AudioManager.Play(Sfx.Jump);
                 // Consume both so a single press can't double-jump within the windows.
                 _jumpBufferedTime = float.NegativeInfinity;
                 _lastGroundedTime = float.NegativeInfinity;
@@ -254,6 +256,7 @@ namespace StumbleClone.Player
             _rb.AddForce(force + Vector3.up * GameConstants.KnockbackUpward, ForceMode.Impulse);
             _inputLockUntil = Time.time + inputLockOnKnockback;
             if (_animator != null) _animator.TriggerKnockedDown();
+            AudioManager.Play(Sfx.Hit);
         }
 
         public void Eliminate()
