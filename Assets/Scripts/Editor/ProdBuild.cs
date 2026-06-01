@@ -16,13 +16,16 @@ namespace StumbleClone.EditorTools
         [MenuItem("StumbleClone/Build/Prod Web (font + anim + WebGL)")]
         public static void WebGL()
         {
-            Debug.Log("[ProdBuild] Step 1/3 — UI font");
+            Debug.Log("[ProdBuild] Step 1/4 — UI font");
             UIFontBuilder.Run();
 
-            Debug.Log("[ProdBuild] Step 2/3 — looping animations");
+            Debug.Log("[ProdBuild] Step 2/4 — looping animations");
             AnimationLoopFixer.Run();
 
-            Debug.Log("[ProdBuild] Step 3/3 — WebGL build");
+            Debug.Log("[ProdBuild] Step 3/4 — character skins");
+            SkinSetup.Run();
+
+            Debug.Log("[ProdBuild] Step 4/4 — WebGL build");
             PlatformBuilder.BuildWebGL(); // calls EditorApplication.Exit in batch mode
         }
     }

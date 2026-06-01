@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 845849757008904165}
   - component: {fileID: 1987749041419067167}
   - component: {fileID: 387697194090682772}
+  - component: {fileID: 1486790982993659156}
   m_Layer: 9
   m_Name: Bot
   m_TagString: Bot
@@ -128,6 +129,10 @@ MonoBehaviour:
   pushForce: 12
   pushCooldown: 0.8
   pushRange: 1.4
+  recoveryScanRadius: 20
+  recoveryMoveSpeed: 9
+  recoveryAirAccel: 28
+  recoveryJumpInterval: 0.32
   racerId: 0
   displayName: 
 --- !u!114 &387697194090682772
@@ -144,6 +149,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StumbleClone.Bots.BotAnimator
   animator: {fileID: 0}
   maxSpeedForNormalization: 6
+--- !u!114 &1486790982993659156
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1166591792909467840}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f68cb0fa1e3adf9478abfc320f36ca07, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StumbleClone.Visuals.CharacterSkin
+  mode: 1
 --- !u!1001 &6662049455744108621
 PrefabInstance:
   m_ObjectHideFlags: 0

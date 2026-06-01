@@ -14,6 +14,7 @@ namespace StumbleClone.UI
         private const string MenuScene = "MainMenu";
         private TMP_InputField _nameInput;
         private TMP_Text _difficultyLabel;
+        private TMP_Text _skinLabel;
         private GameObject _overlay;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -54,10 +55,16 @@ namespace StumbleClone.UI
             _nameInput = RuntimeUI.InputField(bg.transform, "Player", LeaderboardStore.GetPlayerName(),
                 new Vector2(0.5f, 0.6f), new Vector2(0f, -62f), new Vector2(480f, 70f));
 
+            // Skin — tap to cycle the player's character. Persisted; applied on spawn.
+            var skinBtn = RuntimeUI.Button(bg.transform, "SKIN: " + SkinCatalog.DisplayFor(SkinStore.Current),
+                UITheme.Secondary,
+                new Vector2(0.5f, 0.49f), Vector2.zero, new Vector2(460f, 66f), OnCycleSkin);
+            _skinLabel = skinBtn.GetComponentInChildren<TMP_Text>();
+
             // Bot difficulty — tap to cycle Easy / Normal / Hard. Persisted for every round.
             var diffBtn = RuntimeUI.Button(bg.transform, "BOTS: " + BotDifficulty.Label,
                 UITheme.Neutral,
-                new Vector2(0.5f, 0.42f), Vector2.zero, new Vector2(460f, 70f), OnCycleDifficulty);
+                new Vector2(0.5f, 0.40f), Vector2.zero, new Vector2(460f, 66f), OnCycleDifficulty);
             _difficultyLabel = diffBtn.GetComponentInChildren<TMP_Text>();
 
             // PLAY drops straight into the deathmatch (the focused mode) — no second menu.
@@ -74,6 +81,13 @@ namespace StumbleClone.UI
         {
             BotDifficulty.Cycle();
             if (_difficultyLabel != null) _difficultyLabel.text = "BOTS: " + BotDifficulty.Label;
+        }
+
+        private void OnCycleSkin()
+        {
+            string next = SkinCatalog.Next(SkinStore.Current);
+            SkinStore.Current = next;
+            if (_skinLabel != null) _skinLabel.text = "SKIN: " + SkinCatalog.DisplayFor(next);
         }
 
         private void OnPlay()

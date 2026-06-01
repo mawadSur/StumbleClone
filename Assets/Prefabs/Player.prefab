@@ -16,6 +16,7 @@ GameObject:
   - component: {fileID: 252159717588921066}
   - component: {fileID: 2682861180503183234}
   - component: {fileID: 26671318463914039}
+  - component: {fileID: 5684404358628169020}
   m_Layer: 8
   m_Name: Player
   m_TagString: Player
@@ -155,9 +156,14 @@ MonoBehaviour:
   maxSlopeAngle: 50
   coyoteTime: 0.1
   jumpBufferTime: 0.1
+  airDashEnabled: 1
+  dashSpeed: 18
+  dashDuration: 0.18
   racerId: 0
   displayName: Player
   inputLockOnKnockback: 0.3
+  spawnGrace: 1.5
+  logSpawnDiagnostics: 1
 --- !u!114 &2682861180503183234
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -195,6 +201,19 @@ MonoBehaviour:
   body: {fileID: 0}
   controller: {fileID: 0}
   maxSpeedForNormalization: 8
+--- !u!114 &5684404358628169020
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1329869784660260925}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f68cb0fa1e3adf9478abfc320f36ca07, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StumbleClone.Visuals.CharacterSkin
+  mode: 0
 --- !u!1001 &4679483789805297029
 PrefabInstance:
   m_ObjectHideFlags: 0

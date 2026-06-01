@@ -41,6 +41,9 @@ namespace StumbleClone.Visuals
         {
             if (_instance != null && _instance != this) { Destroy(gameObject); return; }
             _instance = this;
+            // Set the bright flat ambient as early as possible so characters never render a frame
+            // under the scene's dark default ambient (the "dark for the first second" bug).
+            ApplyLighting();
         }
 
         private void OnDestroy() { if (_instance == this) _instance = null; }
@@ -49,7 +52,7 @@ namespace StumbleClone.Visuals
         {
             ApplySky();
             ApplyLighting();
-            StartCoroutine(RestyleRacersSoon());
+            StartCoroutine(RestyleRacersContinuously());
         }
 
         // ---- Sky ---------------------------------------------------------------
@@ -152,14 +155,22 @@ namespace StumbleClone.Visuals
 
         // ---- Character restyle -------------------------------------------------
 
-        private IEnumerator RestyleRacersSoon()
+        // Flatten/brighten every racer the moment it exists — the player on frame 1, and each bot
+        // as it spawns — instead of waiting a fixed 0.4s (which left them dark at the start). A
+        // HashSet keeps it idempotent; we sweep for ~1.5s to catch any late spawns, then stop.
+        private readonly System.Collections.Generic.HashSet<GameObject> _styled = new System.Collections.Generic.HashSet<GameObject>();
+
+        private IEnumerator RestyleRacersContinuously()
         {
-            yield return null;                       // let scene objects finish Start
-            yield return new WaitForSeconds(0.4f);   // and let BotSpawner spawn the bots
-            foreach (var p in FindObjectsByType<PlayerController>(FindObjectsSortMode.None))
-                Flatten(p.gameObject, animatorSpeed: 1.1f);
-            foreach (var b in FindObjectsByType<BotController>(FindObjectsSortMode.None))
-                Flatten(b.gameObject, animatorSpeed: 1.08f);
+            float deadline = Time.time + 1.5f;
+            while (Time.time <= deadline)
+            {
+                foreach (var p in FindObjectsByType<PlayerController>(FindObjectsSortMode.None))
+                    if (_styled.Add(p.gameObject)) Flatten(p.gameObject, animatorSpeed: 1.1f);
+                foreach (var b in FindObjectsByType<BotController>(FindObjectsSortMode.None))
+                    if (_styled.Add(b.gameObject)) Flatten(b.gameObject, animatorSpeed: 1.08f);
+                yield return null;
+            }
         }
 
         // Matte, brightened (toon-ish) look without losing the texture; keeps the rig + clips.
