@@ -112,7 +112,8 @@ nothing plays. Avatars unbound (`m_Avatar:0`); controller motions are dangling r
 - 🟡 Verify mobile touch overlay on device (install the APK + play) `P1` 🧑
 - 🧑 Android release keystore + AAB for Play Store (debug-signed APK works for sideload testing now) `P1`
 - 🧑 App icons (1024² master) + branded splash (Unity Personal keeps watermark) `P1`
-- 🧑 **iOS** Xcode project → sign/provision on a Mac + Apple Developer account `P2`
+- ✅ **iOS build pipeline created** — `.github/workflows/build-ios.yml` builds the iOS Xcode project on a GitHub **macOS runner** via game-ci (no Mac of your own needed for the build). Manual-trigger; needs `UNITY_LICENSE` secret to run, + Apple signing secrets (commented in the workflow) for a signed `.ipa`/App Store submission.
+- 🧑 iOS final submission: add `UNITY_LICENSE` (run the workflow) + Apple Developer account/certs for a signed `.ipa` `P2`
 - ⬜ Reconcile PlatformBuilder vs ProjectSettings drift (minSdk 24/25, iOS 13/15, empty iOS usage strings) `P2`
 
 ---

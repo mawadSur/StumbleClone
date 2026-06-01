@@ -1,0 +1,79 @@
+name: Build iOS (cloud Mac)
+
+# Builds the iOS player on a GitHub-hosted macOS runner — so iOS can be built WITHOUT you
+# owning a Mac. game-ci runs Unity on macOS and produces an Xcode project; an optional second
+# job archives + exports a signed .ipa when you provide Apple signing secrets.
+#
+# REQUIRED secret (Settings → Secrets and variables → Actions) to run at all:
+#   UNITY_LICENSE / UNITY_EMAIL / UNITY_PASSWORD   (same as the WebGL workflow; game-ci activation)
+#
+# OPTIONAL secrets to also produce a signed/TestFlight .ipa (needs your Apple Developer account):
+#   IOS_CERTIFICATE_BASE64, IOS_CERTIFICATE_PASSWORD, IOS_PROVISIONING_PROFILE_BASE64,
+#   APPLE_TEAM_ID, IOS_BUNDLE_ID (must match the provisioning profile)
+#
+# Trigger is manual (workflow_dispatch) so it only runs when you ask and have the secrets.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build-xcode-project:
+    name: Unity → Xcode project (macOS runner)
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: false
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-iOS-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-iOS-
+            Library-
+
+      - name: Build (game-ci, iOS)
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          unityVersion: 6000.4.8f1
+          targetPlatform: iOS
+          allowDirtyBuild: true
+
+      - name: Upload Xcode project artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: iOS-Xcode-Project
+          path: build/iOS
+          retention-days: 7
+
+      # ---- Optional: archive + export a signed .ipa (only if Apple secrets are present) ----
+      # Uncomment and provide the IOS_* / APPLE_TEAM_ID secrets above to get an installable .ipa.
+      #
+      # - name: Import signing assets
+      #   run: |
+      #     echo "${{ secrets.IOS_CERTIFICATE_BASE64 }}" | base64 -d > cert.p12
+      #     echo "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" | base64 -d > pp.mobileprovision
+      #     security create-keychain -p "" build.keychain
+      #     security import cert.p12 -k build.keychain -P "${{ secrets.IOS_CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign
+      #     security list-keychains -s build.keychain
+      #     security unlock-keychain -p "" build.keychain
+      #     mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+      #     cp pp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+      # - name: Archive + export .ipa
+      #   working-directory: build/iOS
+      #   run: |
+      #     xcodebuild -project Unity-iPhone.xcodeproj -scheme Unity-iPhone -configuration Release \
+      #       -archivePath build/StumbleClone.xcarchive archive \
+      #       DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} PRODUCT_BUNDLE_IDENTIFIER=${{ secrets.IOS_BUNDLE_ID }}
+      #     xcodebuild -exportArchive -archivePath build/StumbleClone.xcarchive \
+      #       -exportPath build/ipa -exportOptionsPlist ExportOptions.plist
+      # - name: Upload .ipa
+      #   uses: actions/upload-artifact@v4
+      #   with: { name: StumbleClone-ipa, path: build/iOS/build/ipa }
