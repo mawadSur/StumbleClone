@@ -135,6 +135,6 @@ FBX character variants. So we need a **scenes-only / non-destructive** rebuild p
 
 - ✅ Added scenes-only editor entry: `StumbleClone ▸ Rebuild Scenes Only (keep prefabs)` (`MvpBootstrap.RebuildScenesOnly`)
 - ✅ Compile-by-inspection: 3-agent adversarial review of all session C# → **clean** (1 ternary bug found + fixed)
-- ⬜ Run the rebuild (headless if editor closed, or via menu) to materialize EPIC 0 `P0` 🧑
-- ⬜ Final compile-verify (0 `error CS`) on the actual Unity recompile `P0` 🧑
+- ✅ **Final compile-verify: real Unity recompile = 0 `error CS`** (2026-05-31, all session code compiles)
+- ⬜ Run the rebuild (`StumbleClone ▸ Rebuild Scenes Only`, or headless if editor closed) to materialize EPIC 0 scene bits `P0` 🧑
 - 🧑 In-editor smoke test each mode before tagging a build `P1`
