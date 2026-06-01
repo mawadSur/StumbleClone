@@ -9,9 +9,10 @@ Status legend: ✅ done · 🟡 partial / in progress · ⬜ todo · 🧑 needs 
 Last updated: 2026-05-31. Source of truth for "what's left." Update the boxes as work lands.
 
 **Repo is LIVE:** https://github.com/mawadSur/StumbleClone (public, pushed to `main`).
-**Session progress:** EPIC 0 (bug fixes) + EPIC 1 (spawn patterns) + EPIC 8 (safe-rebuild entry)
-written in code; EPIC 7 (repo + CI/Vercel scaffold) shipped. Pending a Unity compile checkpoint
-+ scenes rebuild to make EPIC 0/1 live in-editor.
+**Session progress (2026-05-31):** ✅ Real Unity recompile = **0 compile errors**. ✅ Scenes
+**rebuilt** (`RebuildScenesOnly`, FBX prefabs preserved) — EPIC 0/1 now live + committed. ✅ EPIC
+0,1,8 done; 4 (audio), 5 (data+title+leaderboard UI), 7 (repo+CI) shipped; 3 (procedural anim)
+live. ▶ First headless **WebGL build** running. Remaining: CI secrets, animated pack, mobile/iOS builds.
 
 ---
 
@@ -26,7 +27,7 @@ top (= infinite lives), and never created the spectate overlay.
 - ✅ One life per game (no respawn-on-top) — falling eliminates; spectate kicks in
 - ✅ Player no longer starts on the edge — arena spawn ring 17→**11** (inside the rim), bots offset to point 1 so they don't stack on the player (point 0)
 - ✅ Spectate "End Run"/Restart now work in direct-play too (were no-ops without GameManager) — `SpectateController.cs`
-- 🟡 **Rebuild the 3 level scenes** so these builder changes materialize (see EPIC 8) — *blocks in-editor verification*
+- ✅ **Rebuilt the 3 level scenes** (`RebuildScenesOnly`, 0 errors) — builder changes materialized + committed
 - 🧑 Playtest-confirm: fall → spectate a survivor → "End Run" returns to menu; one life respected
 
 ---
