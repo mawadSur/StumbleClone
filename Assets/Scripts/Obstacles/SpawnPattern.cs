@@ -173,19 +173,19 @@ namespace StumbleClone.Obstacles
                     return roll < 35 ? new CrossSweep()
                          : roll < 60 ? new Rain()
                          : roll < 80 ? new Pincer()
-                         : new ClockwiseRotation();
+                         : (SpawnPattern)new ClockwiseRotation();
                 case 2:
                     return roll < 22 ? new CrossSweep()
                          : roll < 42 ? new Rain()
                          : roll < 60 ? new Pincer()
                          : roll < 80 ? new ClockwiseRotation()
-                         : new Spiral();
+                         : (SpawnPattern)new Spiral();
                 default: // tier 3+
                     return roll < 18 ? new Pincer()
                          : roll < 42 ? new ClockwiseRotation()
                          : roll < 66 ? new Spiral()
                          : roll < 84 ? new CrossSweep()
-                         : new Gauntlet();
+                         : (SpawnPattern)new Gauntlet();
             }
         }
     }
