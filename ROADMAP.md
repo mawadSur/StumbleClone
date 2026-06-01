@@ -125,12 +125,9 @@ nothing plays. Avatars unbound (`m_Avatar:0`); controller motions are dangling r
 - ✅ Created **public** GitHub repo under `mawadSur` + pushed → https://github.com/mawadSur/StumbleClone
 - ✅ `vercel.json` — gzip WebGL `Content-Encoding`/`Content-Type` headers
 - ✅ GitHub Actions `deploy-web.yml`: `game-ci/unity-builder` (WebGL) → deploy to Vercel on push to main
-- ✅ **Live production deploy: https://stumbleclone.vercel.app** (manual `vercel deploy`, project `stumbleclone` under mawadsur)
-- 🧑 **For AUTO-deploy on push**, add repo secrets (Settings → Secrets → Actions). I have 2 ready for you:
-  - `VERCEL_ORG_ID` = `team_dBnwdDkq7Sc8mDm0dmKyRJhP`
-  - `VERCEL_PROJECT_ID` = `prj_QnCvznIvedkcmkhluoMBbABWX9d3`
-  - `VERCEL_TOKEN` (vercel.com/account/tokens) + `UNITY_LICENSE`/`UNITY_EMAIL`/`UNITY_PASSWORD` (yours)
-- ⬜ End-to-end verify: push → CI builds → Vercel URL updates `P1`
+- ✅ **AUTO-DEPLOY ACTIVE**: `vercel git connect` linked the repo → **every push to main auto-deploys** the committed `web/` build to https://stumbleclone.vercel.app (no secrets — uses the Vercel↔GitHub account link). Verified: pushes produced Production deployments automatically.
+- ✅ To refresh after code changes: rebuild WebGL → copy into `web/` → commit → push (auto-redeploys).
+- 🧑 *Optional* rebuild-from-source CI (`deploy-web.yml`, now manual-only): add `UNITY_LICENSE`/`EMAIL`/`PASSWORD` + `VERCEL_TOKEN` (+ `VERCEL_ORG_ID`=`team_dBnwdDkq7Sc8mDm0dmKyRJhP`, `VERCEL_PROJECT_ID`=`prj_QnCvznIvedkcmkhluoMBbABWX9d3`) and flip its trigger back to `push`.
 
 ---
 
