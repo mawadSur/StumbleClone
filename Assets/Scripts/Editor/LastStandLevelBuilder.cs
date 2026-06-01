@@ -17,7 +17,6 @@ namespace StumbleClone.EditorTools
 
             BuildLighting(root.transform);
             BuildArena(root.transform);
-            BuildShrinkVisualizer(root.transform);
             BuildSpawnPoints(root.transform);
             BuildFallKillZone(root.transform);
 
@@ -37,7 +36,7 @@ namespace StumbleClone.EditorTools
             });
 
             Selection.activeGameObject = root;
-            Debug.Log("[LastStandLevelBuilder] Built. Save as Assets/Scenes/Level_LastStanding.unity (must match LevelManager scene name). Eliminations happen when racers leave the shrinking radius.");
+            Debug.Log("[LastStandLevelBuilder] Built. Save as Assets/Scenes/Level_LastStanding.unity. Hazards spawn from the rim in telegraphed patterns; last racer alive wins.");
         }
 
         private static void BuildLighting(Transform parent)
@@ -54,14 +53,6 @@ namespace StumbleClone.EditorTools
         {
             var arena = BuilderUtils.CreatePrimitive(PrimitiveType.Cylinder, "Arena", parent, new Vector3(0f, 0f, 0f), new Vector3(40f, 0.4f, 40f), Color.HSVToRGB(0.6f, 0.3f, 0.9f));
             BuilderUtils.MarkGround(arena);
-        }
-
-        private static void BuildShrinkVisualizer(Transform parent)
-        {
-            var go = new GameObject("ShrinkingZone");
-            go.transform.SetParent(parent, false);
-            go.transform.position = new Vector3(0f, 0.3f, 0f);
-            go.AddComponent<ShrinkingZoneVisualizer>();
         }
 
         private static void BuildSpawnPoints(Transform parent)

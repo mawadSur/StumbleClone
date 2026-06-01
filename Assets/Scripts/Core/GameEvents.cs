@@ -13,7 +13,6 @@ namespace StumbleClone.Core
         public static event Action<IRacer> RacerEliminated;
         public static event Action<IRacer, int> RacerRankChanged; // (racer, rank starting at 1)
         public static event Action<float> SurvivalTimerTick;    // seconds remaining
-        public static event Action<float> ShrinkRadiusChanged;  // last-stand radius
 
         public static void RaiseLevelStarted(LevelMode mode) => LevelStarted?.Invoke(mode);
         public static void RaiseLevelEnded(IRacer winner) => LevelEnded?.Invoke(winner);
@@ -21,7 +20,6 @@ namespace StumbleClone.Core
         public static void RaiseRacerEliminated(IRacer r) => RacerEliminated?.Invoke(r);
         public static void RaiseRacerRankChanged(IRacer r, int rank) => RacerRankChanged?.Invoke(r, rank);
         public static void RaiseSurvivalTimerTick(float seconds) => SurvivalTimerTick?.Invoke(seconds);
-        public static void RaiseShrinkRadiusChanged(float radius) => ShrinkRadiusChanged?.Invoke(radius);
 
         /// Clear all subscribers — call from scene unload guards to avoid stale references.
         public static void Reset()
@@ -32,7 +30,6 @@ namespace StumbleClone.Core
             RacerEliminated = null;
             RacerRankChanged = null;
             SurvivalTimerTick = null;
-            ShrinkRadiusChanged = null;
         }
     }
 }
