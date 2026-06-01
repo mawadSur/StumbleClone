@@ -80,3 +80,8 @@ memory/
 .utmp/
 .bee/
 artifacts/
+
+# The Vercel-deployed WebGL build lives in web/ — its Build/ folder must be tracked
+# even though the general [Bb]uild/ rule would ignore it.
+!web/Build/
+!web/Build/**
