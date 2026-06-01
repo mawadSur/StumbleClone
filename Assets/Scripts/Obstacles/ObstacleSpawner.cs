@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Collections.Generic;
 using StumbleClone.Core;
 using UnityEngine;
 
@@ -12,31 +14,28 @@ namespace StumbleClone.Obstacles
         StepBlocks,
     }
 
-    /// Drives the Knockout arena: spawns hazards from the platform rim aimed inward,
-    /// escalating spawn rate / speed / force as time passes and as racers are eliminated.
-    /// Built procedurally from primitives so the mode is fully playable before any art
-    /// import (swap to prefabs later). Created at runtime by LastStandingManager via Begin().
+    /// Drives the Knockout arena. Instead of firing hazards from a random rim angle, it runs
+    /// TELEGRAPHED WAVES: each wave is a named, recognizable pattern (Cross Sweep, Pincer,
+    /// Clockwise Rotation, Spiral, Rain, Gauntlet) whose hazards come from discrete rim
+    /// directions. A ground marker telegraphs each spawn so the player can read and learn it.
+    /// Difficulty rises over time + eliminations (intensity → tier), and a SEEDED RNG keeps the
+    /// early sequence identical every round so patterns are learnable. Built from primitives so
+    /// the mode is playable before any art. Created at runtime by LastStandingManager via Begin().
     public sealed class ObstacleSpawner : MonoBehaviour
     {
         [SerializeField] private float spawnRadius = 18f;
         [SerializeField] private float rampDuration = 75f;
-        [SerializeField] private float minInterval = 0.6f;
-        [SerializeField] private float maxInterval = 2.8f;
+        [Tooltip("Diameter of the ground telegraph disc shown before each hazard spawns.")]
+        [SerializeField] private float telegraphSize = 4f;
 
-        private static readonly ObstacleType[] PushTypes =
-        {
-            ObstacleType.RollingBoulder,
-            ObstacleType.SlidingRam,
-            ObstacleType.SweepingBar,
-            ObstacleType.BouncingBall,
-            ObstacleType.StepBlocks,
-        };
+        // Fixed so the opening waves are the SAME every round → the player can learn them.
+        private const int PatternSeed = 9173;
 
         private Transform _center;
         private bool _spawning;
         private float _startTime;
         private int _initialAlive;
-        private float _nextSpawnTime;
+        private System.Random _rng;
         private PhysicsMaterial _bouncy;
 
         /// Called by the mode manager once the level has started.
@@ -46,27 +45,68 @@ namespace StumbleClone.Obstacles
             if (radius > 0.1f) spawnRadius = radius;
             _startTime = Time.time;
             _initialAlive = Mathf.Max(1, RacerRegistry.AliveCount);
-            _nextSpawnTime = Time.time + 2f; // brief grace before the first hazard
+            _rng = new System.Random(PatternSeed);
             _spawning = true;
+            StopAllCoroutines();
+            StartCoroutine(WaveLoop());
         }
 
-        public void StopSpawning() => _spawning = false;
-
-        private void Update()
+        public void StopSpawning()
         {
-            if (!_spawning) return;
-            if (RacerRegistry.AliveCount <= 1) { _spawning = false; return; }
-
-            if (Time.time < _nextSpawnTime) return;
-
-            float intensity = ComputeIntensity();
-            SpawnOne(intensity);
-            // At high intensity, occasionally double up for chaos.
-            if (intensity > 0.6f && Random.value < (intensity - 0.6f)) SpawnOne(intensity);
-
-            float interval = Mathf.Lerp(maxInterval, minInterval, intensity);
-            _nextSpawnTime = Time.time + interval;
+            _spawning = false;
+            StopAllCoroutines();
         }
+
+        private IEnumerator WaveLoop()
+        {
+            yield return new WaitForSeconds(2f); // grace before the first wave
+
+            var entries = new List<SpawnEntry>(16);
+            while (_spawning)
+            {
+                if (RacerRegistry.AliveCount <= 1) { _spawning = false; yield break; }
+
+                float intensity = ComputeIntensity();
+                int tier = Mathf.Clamp(Mathf.FloorToInt(intensity * 4f), 0, 3);
+
+                SpawnPattern pattern = PatternLibrary.Select(tier, _rng);
+                entries.Clear();
+                pattern.Build(entries, tier);
+                entries.Sort(CompareDelay);
+
+                float lead = pattern.TelegraphLead;
+                Vector3 centerPos = _center != null ? _center.position : Vector3.zero;
+                float groundY = centerPos.y + 0.45f;
+
+                // Telegraph the whole wave up-front; each marker lives until its hazard lands.
+                for (int i = 0; i < entries.Count; i++)
+                {
+                    Vector3 rim = ArenaDirections.RimPoint(centerPos, spawnRadius, entries[i].dir);
+                    TelegraphIndicator.Spawn(rim, groundY, lead + entries[i].delay, telegraphSize);
+                }
+
+                float speedScale = Mathf.Lerp(1f, 2f, intensity);
+                float forceScale = Mathf.Lerp(1f, 1.7f, intensity);
+
+                yield return new WaitForSeconds(lead);
+
+                float spawnedAt = 0f;
+                for (int i = 0; i < entries.Count && _spawning; i++)
+                {
+                    float wait = entries[i].delay - spawnedAt;
+                    if (wait > 0f) yield return new WaitForSeconds(wait);
+                    spawnedAt = entries[i].delay;
+
+                    Vector3 rim = ArenaDirections.RimPoint(centerPos, spawnRadius, entries[i].dir);
+                    SpawnTypeAt(entries[i].type, rim, speedScale, forceScale);
+                }
+
+                // Breather between waves — shorter as the round heats up.
+                yield return new WaitForSeconds(Mathf.Lerp(2.6f, 0.8f, intensity));
+            }
+        }
+
+        private static int CompareDelay(SpawnEntry a, SpawnEntry b) => a.delay.CompareTo(b.delay);
 
         private float ComputeIntensity()
         {
@@ -76,16 +116,8 @@ namespace StumbleClone.Obstacles
             return Mathf.Clamp01(0.5f * timeT + 0.5f * deathT);
         }
 
-        private void SpawnOne(float intensity)
+        private void SpawnTypeAt(ObstacleType type, Vector3 rim, float speedScale, float forceScale)
         {
-            float speedScale = Mathf.Lerp(1f, 2f, intensity);
-            float forceScale = Mathf.Lerp(1f, 1.7f, intensity);
-
-            float angle = Random.value * Mathf.PI * 2f;
-            Vector3 centerPos = _center != null ? _center.position : Vector3.zero;
-            Vector3 rim = centerPos + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * spawnRadius;
-
-            ObstacleType type = PushTypes[Random.Range(0, PushTypes.Length)];
             switch (type)
             {
                 case ObstacleType.RollingBoulder: SpawnBoulder(rim, speedScale, forceScale); break;

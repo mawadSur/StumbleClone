@@ -8,6 +8,11 @@ recognizable directional patterns.**
 Status legend: ✅ done · 🟡 partial / in progress · ⬜ todo · 🧑 needs you (account/art/secrets/playtest)
 Last updated: 2026-05-31. Source of truth for "what's left." Update the boxes as work lands.
 
+**Repo is LIVE:** https://github.com/mawadSur/StumbleClone (public, pushed to `main`).
+**Session progress:** EPIC 0 (bug fixes) + EPIC 1 (spawn patterns) + EPIC 8 (safe-rebuild entry)
+written in code; EPIC 7 (repo + CI/Vercel scaffold) shipped. Pending a Unity compile checkpoint
++ scenes rebuild to make EPIC 0/1 live in-editor.
+
 ---
 
 ## EPIC 0 — Last-Standing playtest fixes (your reported bugs) — **CODE DONE, pending scene rebuild**
@@ -31,12 +36,12 @@ top (= infinite lives), and never created the spectate overlay.
 Today: `ObstacleSpawner` picks a **uniformly-random** rim angle + random type every spawn — no
 directions, no patterns, no telegraph, not learnable. Replace with a telegraphed wave system.
 
-- ⬜ `SpawnDirection.cs` — 8-octant enum (N/NE/E/SE/S/SW/W/NW) + rim-point helper (the shared vocabulary) `P0`
-- ⬜ `SpawnPattern.cs` — wave model: ordered `{direction, type, delay}` entries + telegraph lead + min tier `P0`
-- ⬜ 6 named patterns (CrossSweep, Pincer, ClockwiseRotation, Spiral, Rain, Gauntlet) `P0`
-- ⬜ `TelegraphIndicator.cs` — ground marker/arc that pulses yellow→red before each spawn `P0`
-- ⬜ `WaveScheduler` — replace the random `Update` loop: TELEGRAPH → SPAWN (reuse existing factories) → REST `P0`
-- ⬜ Deterministic, difficulty-tiered pattern selection (fixed early seed = learnable; harder later) `P1`
+- ✅ `SpawnPattern.cs` — 8-octant `SpawnDirection` + rim-point helper (the shared vocabulary)
+- ✅ `SpawnPattern.cs` — wave model: ordered `{direction, type, delay}` entries + telegraph lead + tier
+- ✅ 6 named patterns (CrossSweep, Pincer, ClockwiseRotation, Spiral, Rain, Gauntlet)
+- ✅ `TelegraphIndicator.cs` — pulsing yellow→red ground disc before each spawn
+- ✅ Wave scheduler in `ObstacleSpawner` — coroutine TELEGRAPH → SPAWN (reuses factories) → REST
+- ✅ Deterministic, difficulty-tiered, seeded selection (fixed early seed = learnable; harder later)
 - ⬜ Thread explicit direction/spin into `RollingBoulder`/`SweepingBar` so internal randomness stops fighting patterns `P1`
 - ⬜ `GameEvents.WaveTelegraphed(name,dir)` so audio/UI can play a directional "tell" `P2`
 - ⬜ Wire `arenaCenter` in `LastStandLevelBuilder` (today only `MvpBootstrap` sets it) `P2`
@@ -109,13 +114,13 @@ nothing plays. Avatars unbound (`m_Avatar:0`); controller motions are dangling r
 
 ## EPIC 7 — Public repo + CI + Vercel auto-deploy
 
-- ⬜ Unity `.gitignore` (+ `.gitattributes`) at project root **before** git init `P0`
-- ⬜ Strip/guard `unity-mcp` from `Packages/manifest.json` so CI can resolve packages `P0`
-- ⬜ `git init` + initial commit `P0`
-- ⬜ Create **public** GitHub repo under `mawadSur` + push `P0`
-- ⬜ `vercel.json` — serve gzip WebGL with correct `Content-Encoding`/`Content-Type` headers `P0`
-- ⬜ GitHub Actions: `game-ci/unity-builder` (WebGL) → deploy to Vercel on push to main `P0`
-- 🧑 Provide secrets: `UNITY_LICENSE`/`UNITY_EMAIL`/`UNITY_PASSWORD` + `VERCEL_TOKEN`/`ORG_ID`/`PROJECT_ID` `P0`
+- ✅ Unity `.gitignore` (+ `.gitattributes`) at project root before git init
+- ✅ Stripped `unity-mcp` git package from `Packages/manifest.json` so CI can resolve packages
+- ✅ `git init` + initial commit
+- ✅ Created **public** GitHub repo under `mawadSur` + pushed → https://github.com/mawadSur/StumbleClone
+- ✅ `vercel.json` — gzip WebGL `Content-Encoding`/`Content-Type` headers
+- ✅ GitHub Actions `deploy-web.yml`: `game-ci/unity-builder` (WebGL) → deploy to Vercel on push to main
+- 🧑 **Add repo secrets** (Settings → Secrets → Actions): `UNITY_LICENSE`/`UNITY_EMAIL`/`UNITY_PASSWORD` + `VERCEL_TOKEN`/`VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` — until then CI fails at Unity activation `P0`
 - ⬜ End-to-end verify: push → CI builds → Vercel URL loads the game `P1`
 
 ---
@@ -126,7 +131,7 @@ The level-builder + settings changes only reach the binary scenes via an editor 
 catch: a **full** `MvpBootstrap.Run` rebuilds Player/Bot prefabs as **capsules**, clobbering the
 FBX character variants. So we need a **scenes-only / non-destructive** rebuild path.
 
-- ⬜ Add a scenes-only editor entry (rebuild level scenes + re-wire, **skip** prefab rebuild) `P0`
-- ⬜ Run it headless (editor closed) or via menu (editor open) to materialize EPIC 0 + EPIC 1 `P0`
-- ⬜ Compile-verify (0 `error CS`) after each code batch `P0`
+- ✅ Added scenes-only editor entry: `StumbleClone ▸ Rebuild Scenes Only (keep prefabs)` (`MvpBootstrap.RebuildScenesOnly`)
+- ⬜ Run it (headless if editor closed, or via menu) to materialize EPIC 0 `P0`
+- ⬜ Compile-verify (0 `error CS`) — needs the editor to recompile the new scripts `P0`
 - 🧑 In-editor smoke test each mode before tagging a build `P1`

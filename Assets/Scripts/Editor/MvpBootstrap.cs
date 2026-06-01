@@ -105,6 +105,65 @@ namespace StumbleClone.EditorTools
             }
         }
 
+        /// Rebuilds ONLY the scenes (+ tags/layers/materials/build-settings) and re-wires them
+        /// to the EXISTING Player/Bot prefabs — it does NOT rebuild the prefabs, so imported FBX
+        /// character variants are preserved (Run() rebuilds them as capsules). Use this to
+        /// materialize level-builder changes — spawn points, KillZone mode, LevelSelfStart,
+        /// bot offset, NavMesh bake — without regressing the characters.
+        ///
+        /// Headless (GUI closed):
+        ///   Unity.exe -batchmode -projectPath "&lt;win&gt;" \
+        ///     -executeMethod StumbleClone.EditorTools.MvpBootstrap.RebuildScenesOnly -logFile &lt;log&gt;
+        [MenuItem("StumbleClone/Rebuild Scenes Only (keep prefabs)")]
+        public static void RebuildScenesOnly()
+        {
+            int stepIndex = 0;
+            try
+            {
+                LogStep(++stepIndex, "Configure Tags & Layers");
+                ConfigureTagsAndLayers();
+
+                LogStep(++stepIndex, "Ensure asset folders exist");
+                EnsureFolders();
+
+                LogStep(++stepIndex, "Build URP materials");
+                BuildMaterials();
+
+                LogStep(++stepIndex, "Skipping prefab build — preserving existing FBX character prefabs");
+
+                LogStep(++stepIndex, "Build Race level scene");
+                BuildLevelScene(LevelMode.Race, RaceScenePath, RaceLevelBuilder.Build, "RaceLevel");
+
+                LogStep(++stepIndex, "Build Survival level scene");
+                BuildLevelScene(LevelMode.Survival, SurvivalScenePath, SurvivalLevelBuilder.Build, "SurvivalLevel");
+
+                LogStep(++stepIndex, "Build LastStanding level scene");
+                BuildLevelScene(LevelMode.LastStanding, LastStandingScenePath, LastStandLevelBuilder.Build, "LastStandLevel");
+
+                LogStep(++stepIndex, "Build MainMenu scene");
+                BuildMainMenuScene();
+
+                LogStep(++stepIndex, "Update EditorBuildSettings");
+                ConfigureBuildSettings();
+
+                LogStep(++stepIndex, "Save and refresh AssetDatabase");
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+
+                if (!Application.isBatchMode)
+                    EditorSceneManager.OpenScene(LastStandingScenePath, OpenSceneMode.Single);
+
+                Debug.Log("[Bootstrap] Rebuild Scenes Only: Done.");
+                if (Application.isBatchMode) EditorApplication.Exit(0);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[Bootstrap] Rebuild Scenes Only FAILED at step {stepIndex}: {e}");
+                if (Application.isBatchMode) EditorApplication.Exit(1);
+                else throw;
+            }
+        }
+
         private static void LogStep(int n, string what) => Debug.Log($"[Bootstrap] step {n}: {what}");
 
         // =======================================================================
