@@ -150,18 +150,15 @@
       // Unity's new Input System reads keyboard on WebGL via events delivered to
       // the FOCUSED canvas. With no focus, WASD/Space do nothing — the player
       // can't move (the "WASD doesn't work / I just stand still and die" bug).
-      // Force the canvas to take/keep focus on load and on any interaction, and
-      // keep arrows/space/Tab inside the game so they don't scroll or blur it.
-      function focusCanvas() { try { canvas.focus(); } catch (e) {} }
-      ["pointerdown", "touchstart", "mousedown", "click"].forEach(function (evt) {
-        window.addEventListener(evt, focusCanvas, true);
-      });
-      window.addEventListener("load", focusCanvas);
-      window.addEventListener("keydown", function (e) {
-        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","Spacebar","Tab"].indexOf(e.key) !== -1) {
-          e.preventDefault();
+      // Focus the canvas when the player taps it, and once the game is ready.
+      // The activeElement guard avoids a focus -> Unity-synthesized-event -> focus
+      // loop (which overflowed the stack and stopped Unity from starting).
+      function focusCanvas() {
+        if (document.activeElement !== canvas) {
+          try { canvas.focus({ preventScroll: true }); } catch (e) {}
         }
-      }, false);
+      }
+      canvas.addEventListener("pointerdown", focusCanvas);
 
       function unityShowBanner(msg, type) {
         var warningBanner = document.querySelector("#unity-warning");
