@@ -49,30 +49,31 @@ namespace StumbleClone.UI
             RuntimeUI.Label(bg.transform, "Knockout party arena — last one standing wins", 38,
                 new Vector2(0.5f, 0.71f), Vector2.zero, new Vector2(1400f, 80f));
 
-            // Name entry: label sits just above its input box.
+            // Name entry: label sits just above its input box. (Anchors below are tuned so the
+            // input, SKIN, BOTS, PLAY and LEADERBOARD bands never overlap at the 1080 reference.)
             RuntimeUI.Label(bg.transform, "YOUR NAME", 28,
-                new Vector2(0.5f, 0.6f), Vector2.zero, new Vector2(600f, 50f));
+                new Vector2(0.5f, 0.63f), Vector2.zero, new Vector2(600f, 46f));
             _nameInput = RuntimeUI.InputField(bg.transform, "Player", LeaderboardStore.GetPlayerName(),
-                new Vector2(0.5f, 0.6f), new Vector2(0f, -62f), new Vector2(480f, 70f));
+                new Vector2(0.5f, 0.63f), new Vector2(0f, -56f), new Vector2(470f, 64f));
 
             // Skin — tap to cycle the player's character. Persisted; applied on spawn.
             var skinBtn = RuntimeUI.Button(bg.transform, "SKIN: " + SkinCatalog.DisplayFor(SkinStore.Current),
                 UITheme.Secondary,
-                new Vector2(0.5f, 0.49f), Vector2.zero, new Vector2(460f, 66f), OnCycleSkin);
+                new Vector2(0.5f, 0.475f), Vector2.zero, new Vector2(460f, 64f), OnCycleSkin);
             _skinLabel = skinBtn.GetComponentInChildren<TMP_Text>();
 
             // Bot difficulty — tap to cycle Easy / Normal / Hard. Persisted for every round.
             var diffBtn = RuntimeUI.Button(bg.transform, "BOTS: " + BotDifficulty.Label,
                 UITheme.Neutral,
-                new Vector2(0.5f, 0.40f), Vector2.zero, new Vector2(460f, 66f), OnCycleDifficulty);
+                new Vector2(0.5f, 0.39f), Vector2.zero, new Vector2(460f, 64f), OnCycleDifficulty);
             _difficultyLabel = diffBtn.GetComponentInChildren<TMP_Text>();
 
             // PLAY drops straight into the deathmatch (the focused mode) — no second menu.
             // Single primary CTA (pink); leaderboard is the subordinate secondary action (purple).
             RuntimeUI.Button(bg.transform, "PLAY", UITheme.Primary,
-                new Vector2(0.5f, 0.28f), Vector2.zero, new Vector2(440f, 96f), OnPlay);
+                new Vector2(0.5f, 0.27f), Vector2.zero, new Vector2(440f, 92f), OnPlay);
             RuntimeUI.Button(bg.transform, "LEADERBOARD", UITheme.Secondary,
-                new Vector2(0.5f, 0.14f), Vector2.zero, new Vector2(440f, 68f), OnLeaderboard);
+                new Vector2(0.5f, 0.13f), Vector2.zero, new Vector2(440f, 66f), OnLeaderboard);
 
             OverlayIntro.Play(_overlay);
         }
