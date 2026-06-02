@@ -146,6 +146,23 @@
       var barFill = document.querySelector("#bar-fill");
       var loadingPct = document.querySelector("#loading-pct");
 
+      // --- WebGL keyboard focus fix ---------------------------------------
+      // Unity's new Input System reads keyboard on WebGL via events delivered to
+      // the FOCUSED canvas. With no focus, WASD/Space do nothing — the player
+      // can't move (the "WASD doesn't work / I just stand still and die" bug).
+      // Force the canvas to take/keep focus on load and on any interaction, and
+      // keep arrows/space/Tab inside the game so they don't scroll or blur it.
+      function focusCanvas() { try { canvas.focus(); } catch (e) {} }
+      ["pointerdown", "touchstart", "mousedown", "click"].forEach(function (evt) {
+        window.addEventListener(evt, focusCanvas, true);
+      });
+      window.addEventListener("load", focusCanvas);
+      window.addEventListener("keydown", function (e) {
+        if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","Spacebar","Tab"].indexOf(e.key) !== -1) {
+          e.preventDefault();
+        }
+      }, false);
+
       function unityShowBanner(msg, type) {
         var warningBanner = document.querySelector("#unity-warning");
         function updateVisibility() {
@@ -195,8 +212,10 @@
           .then((unityInstance) => {
             loading.style.opacity = "0";
             setTimeout(function () { loading.style.display = "none"; }, 450);
+            focusCanvas(); // grab keyboard focus the moment the game is interactive
             document.querySelector("#fs-btn").onclick = () => {
               unityInstance.SetFullscreen(1);
+              focusCanvas(); // fullscreen toggle steals focus; give it straight back
             };
           })
           .catch((message) => {
