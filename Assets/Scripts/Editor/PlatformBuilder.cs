@@ -22,10 +22,10 @@ namespace StumbleClone.EditorTools
     public static class PlatformBuilder
     {
         private const string Company = "ClaudeCodeGameStudios";
-        private const string Product = "StumbleClone";
+        private const string Product = "StumbleKids";
         // Placeholder reverse-DNS id. For iOS device installs / store builds,
         // change this to one that matches your Apple provisioning profile.
-        private const string BundleId = "com.stumbleclone.game";
+        private const string BundleId = "com.stumblekids.game";
 
         private const string OutputRoot = "Builds";
 

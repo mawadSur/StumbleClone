@@ -41,7 +41,7 @@ namespace StumbleClone.UI
             var bg = RuntimeUI.Panel(_overlay.transform, "Bg", UITheme.SurfaceDeep,
                 Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
-            var title = RuntimeUI.Label(bg.transform, "STUMBLE CLONE", 120,
+            var title = RuntimeUI.Label(bg.transform, "STUMBLE KIDS", 120,
                 new Vector2(0.5f, 0.82f), Vector2.zero, new Vector2(1500f, 200f));
             title.fontStyle = FontStyles.Bold;
             title.color = UITheme.Gold;

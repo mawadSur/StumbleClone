@@ -4,7 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#0E1018" />
-    <title>StumbleClone</title>
+    <title>StumbleKids</title>
+    <link rel="icon" type="image/svg+xml" href="logo.svg" />
     <link rel="shortcut icon" href="TemplateData/favicon.ico" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -69,6 +70,10 @@
         animation: bob 2.2s ease-in-out infinite;
       }
       @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+      #game-logo {
+        width: min(80vw, 460px); height: auto; display: block;
+        animation: bob 2.2s ease-in-out infinite;
+      }
       #tagline { color: var(--muted); font-size: clamp(13px, 2.4vw, 20px); margin-top: -14px; }
       #bar {
         width: min(62vw, 420px); height: 16px; border-radius: 999px;
@@ -82,7 +87,7 @@
       }
       #loading-pct { color: var(--muted); font-size: 15px; font-weight: 500; }
       @media (prefers-reduced-motion: reduce) {
-        #game-title { animation: none; }
+        #game-title, #game-logo { animation: none; }
       }
       /* Fullscreen control */
       #fs-btn {
@@ -119,7 +124,7 @@
     </div>
 
     <div id="loading">
-      <div id="game-title">StumbleClone</div>
+      <img id="game-logo" src="logo.svg" alt="StumbleKids" />
       <div id="tagline">Knockout party arena — last one standing wins</div>
       <div id="bar"><div id="bar-fill"></div></div>
       <div id="loading-pct">Loading… 0%</div>
@@ -168,7 +173,7 @@
         codeUrl: buildUrl + "/WebGL.wasm.unityweb",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "ClaudeCodeGameStudios",
-        productName: "StumbleClone",
+        productName: "StumbleKids",
         productVersion: "1.0",
         showBanner: unityShowBanner,
       };

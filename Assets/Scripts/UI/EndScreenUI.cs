@@ -173,7 +173,7 @@ namespace StumbleClone.UI
         private static string BuildShareIntent(LevelMode mode, int rank)
         {
             string place = rank > 0 ? "#" + rank : "the finish";
-            string text = $"I placed {place} in the {mode} in StumbleClone! Can you beat me?";
+            string text = $"I placed {place} in the {mode} in StumbleKids! Can you beat me?";
             return "https://twitter.com/intent/tweet?text="
                    + UnityWebRequest.EscapeURL(text)
                    + "&url=" + UnityWebRequest.EscapeURL(ShareUrl);

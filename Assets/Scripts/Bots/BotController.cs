@@ -52,6 +52,19 @@ namespace StumbleClone.Bots
         private float _pushCooldownMul = 1f;
         private float _pushForceMul = 1f;
 
+        // ---- Power-up buffs (additive; all neutral when inactive) ----
+        // SPEED scales Agent.speed for a window then restores the captured base. SUPER JUMP scales
+        // the jump impulse while live. SHIELD is a one-use flag consumed by Knockback.
+        private bool _speedBoostActive;
+        private float _speedBoostUntil = float.NegativeInfinity;
+        private float _speedBoostBaseSpeed;            // Agent.speed captured at grant, restored on expiry
+        private float _jumpMultiplier = 1f;
+        private float _jumpBoostUntil = float.NegativeInfinity;
+        private bool _shieldActive;
+
+        /// Active jump launch velocity — base jumpSpeed scaled by any live SUPER JUMP buff.
+        private float ActiveJumpSpeed => Time.time < _jumpBoostUntil ? jumpSpeed * _jumpMultiplier : jumpSpeed;
+
         public int RacerId => racerId;
         public string DisplayName => string.IsNullOrEmpty(displayName) ? ("Bot_" + racerId) : displayName;
         public Transform Transform => transform;
@@ -92,6 +105,11 @@ namespace StumbleClone.Bots
         private void Update()
         {
             if (!_isAlive || _isFinished) return;
+
+            // Tick the SPEED buff every frame (regardless of knockback/recovery state) so the
+            // captured base speed is always restored when the window lapses, even if the agent
+            // was disabled/re-enabled meanwhile.
+            UpdateSpeedBoost();
 
             if (transform.position.y < GameConstants.WorldKillY)
             {
@@ -194,7 +212,7 @@ namespace StumbleClone.Bots
             if (_agent != null && _agent.enabled) _agent.enabled = false;
             _rb.isKinematic = false;
             Vector3 v = _rb.linearVelocity;
-            v.y = jumpSpeed;
+            v.y = ActiveJumpSpeed; // SUPER JUMP buff scales this; == jumpSpeed when inactive
             _rb.linearVelocity = v;
 
             yield return new WaitForSeconds(jumpAgentLockSeconds);
@@ -244,6 +262,13 @@ namespace StumbleClone.Bots
         public void Knockback(Vector3 force)
         {
             if (!_isAlive || _isFinished) return;
+            // SHIELD buff: absorb exactly one incoming hit, then expire. Consumed before the
+            // knockback routine starts so the push reads as fully ignored.
+            if (_shieldActive)
+            {
+                _shieldActive = false;
+                return;
+            }
             StartCoroutine(KnockbackRoutine(force));
         }
 
@@ -277,6 +302,52 @@ namespace StumbleClone.Bots
                     if (_agent.isOnNavMesh) _agent.Warp(hit.position);
                 }
             }
+        }
+
+        // ---- Power-up buff grants (called by Powerup pickups) ----
+
+        /// SPEED power-up: scale this bot's NavMeshAgent speed by <paramref name="multiplier"/> for
+        /// <paramref name="seconds"/>, then restore the speed captured at grant time. A re-grant while
+        /// already boosted refreshes the timer and re-applies the multiplier against the original base
+        /// (so stacking can't compound the speed past one multiplier).
+        /// <param name="multiplier">Speed scale (&gt; 1 = faster); clamped to at least 1.</param>
+        /// <param name="seconds">Duration in seconds the boost stays active.</param>
+        public void ApplySpeedBoost(float multiplier, float seconds)
+        {
+            if (_agent == null) return;
+            float mul = Mathf.Max(1f, multiplier);
+            // Capture the base only on a fresh grant; refreshing an active boost keeps the original base.
+            if (!_speedBoostActive) _speedBoostBaseSpeed = _agent.speed;
+            _speedBoostActive = true;
+            _speedBoostUntil = Time.time + Mathf.Max(0f, seconds);
+            _agent.speed = _speedBoostBaseSpeed * mul;
+        }
+
+        /// SHIELD power-up: arm a one-use guard that ignores the next <see cref="Knockback"/>.
+        /// The shield does not expire on a timer — it persists until a hit consumes it.
+        public void GrantShield()
+        {
+            _shieldActive = true;
+        }
+
+        /// SUPER JUMP power-up: scale this bot's jump impulse by <paramref name="multiplier"/> for
+        /// <paramref name="seconds"/>. Affects intentional jumps started while the timer holds; reverts
+        /// automatically afterward.
+        /// <param name="multiplier">Jump-velocity scale (&gt; 1 = higher); clamped to at least 1.</param>
+        /// <param name="seconds">Duration in seconds the boost stays active.</param>
+        public void GrantJumpBoost(float multiplier, float seconds)
+        {
+            _jumpMultiplier = Mathf.Max(1f, multiplier);
+            _jumpBoostUntil = Time.time + Mathf.Max(0f, seconds);
+        }
+
+        /// Restore the captured base speed once the SPEED window lapses. Cheap no-op while inactive.
+        private void UpdateSpeedBoost()
+        {
+            if (!_speedBoostActive) return;
+            if (Time.time < _speedBoostUntil) return;
+            _speedBoostActive = false;
+            if (_agent != null) _agent.speed = _speedBoostBaseSpeed;
         }
 
         public void Eliminate()
@@ -330,6 +401,14 @@ namespace StumbleClone.Bots
 
             _nextTickTime = 0f;
             _nextPushTime = 0f;
+
+            // Clear any in-flight power-up buffs so a respawn starts clean.
+            if (_speedBoostActive && _agent != null) _agent.speed = _speedBoostBaseSpeed;
+            _speedBoostActive = false;
+            _speedBoostUntil = float.NegativeInfinity;
+            _jumpMultiplier = 1f;
+            _jumpBoostUntil = float.NegativeInfinity;
+            _shieldActive = false;
         }
     }
 }

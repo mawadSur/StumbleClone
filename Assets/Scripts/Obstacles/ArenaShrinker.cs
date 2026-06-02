@@ -222,10 +222,10 @@ namespace StumbleClone.Obstacles
                     _outsideSince[r] = since;
                 }
 
-                // Gentle, throttled inward shove so being outside reads as escalating
-                // pressure. Knockback adds a fixed upward pop + input lock, so we must
-                // NOT call it every frame — throttle per racer.
-                ApplyInwardNudge(r, p);
+                // Being outside the ring is pressure on its own: the closing ring is visible,
+                // and sustained exposure eliminates you. We deliberately do NOT shove the racer
+                // inward — pushing via Knockback locks player input + plays a knockdown reaction
+                // every cycle, which wrecks movement feel. Let players move freely and decide.
 
                 // Eliminate after sustained exposure, but never during spawn grace.
                 if (pastSpawnGrace && (Time.time - since) >= OutsideKillTime)
@@ -239,19 +239,9 @@ namespace StumbleClone.Obstacles
             PruneStaleTrackers(all);
         }
 
-        private void ApplyInwardNudge(IRacer r, Vector3 pos)
-        {
-            if (_lastNudge.TryGetValue(r, out float last) && (Time.time - last) < NudgeInterval)
-                return;
-
-            Vector3 inward = _center - pos;
-            inward.y = 0f;
-            if (inward.sqrMagnitude < 0.0001f) return;
-            inward.Normalize();
-
-            r.Knockback(inward * NudgeForce);
-            _lastNudge[r] = Time.time;
-        }
+        // (Inward-shove removed — see PunishOutsideRacers. Pushing the player via Knockback locked
+        // input and triggered a knockdown reaction every cycle, which broke movement feel. The
+        // closing ring + elimination provide the pressure; the player keeps full control.)
 
         /// Drop tracker entries for racers no longer in the registry (scene swap,
         /// destroyed) so the dictionaries don't hold stale references.

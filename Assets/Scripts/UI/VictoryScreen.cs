@@ -189,7 +189,7 @@ namespace StumbleClone.UI
         private static void OnShare(LevelMode mode, int pos)
         {
             string place = pos > 0 ? $"#{pos} on the {mode} leaderboard" : $"the {mode}";
-            string text = $"I just won {place} in StumbleClone! Can you beat me?";
+            string text = $"I just won {place} in StumbleKids! Can you beat me?";
             string url = "https://twitter.com/intent/tweet?text="
                          + UnityWebRequest.EscapeURL(text)
                          + "&url=" + UnityWebRequest.EscapeURL(ShareUrl);

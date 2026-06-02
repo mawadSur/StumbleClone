@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 300" width="520" height="300" role="img" aria-label="StumbleKids">
+  <defs>
+    <linearGradient id="topGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F472B6"/>
+      <stop offset="1" stop-color="#A855F7"/>
+    </linearGradient>
+    <linearGradient id="botGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFE27A"/>
+      <stop offset="1" stop-color="#F59E0B"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#0E1018" flood-opacity="0.35"/>
+    </filter>
+    <style>
+      .wm { font-family: "Fredoka", "Baloo 2", system-ui, "Segoe UI", sans-serif; font-weight: 700; }
+    </style>
+  </defs>
+
+  <!-- STUMBLE -->
+  <g transform="rotate(-3 260 110)" filter="url(#soft)">
+    <text x="260" y="118" text-anchor="middle" class="wm" font-size="82"
+          fill="url(#topGrad)" stroke="#0E1018" stroke-width="9" paint-order="stroke"
+          stroke-linejoin="round" letter-spacing="2">STUMBLE</text>
+  </g>
+
+  <!-- KIDS -->
+  <g transform="rotate(2.5 260 220)" filter="url(#soft)">
+    <text x="260" y="246" text-anchor="middle" class="wm" font-size="128"
+          fill="url(#botGrad)" stroke="#0E1018" stroke-width="12" paint-order="stroke"
+          stroke-linejoin="round" letter-spacing="3">KIDS</text>
+  </g>
+</svg>

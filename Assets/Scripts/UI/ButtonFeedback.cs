@@ -1,3 +1,4 @@
+using StumbleClone.Audio;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -45,7 +46,13 @@ namespace StumbleClone.UI
 
         public void OnPointerEnter(PointerEventData e) { _hover = true; }
         public void OnPointerExit(PointerEventData e) { _hover = false; _pressed = false; }
-        public void OnPointerDown(PointerEventData e) { if (Interactable) _pressed = true; }
+        public void OnPointerDown(PointerEventData e)
+        {
+            if (!Interactable) return;
+            _pressed = true;
+            // AudioManager.Play is null-safe (no-op until the manager bootstraps), so this never throws.
+            AudioManager.Play(Sfx.UiClick);
+        }
         public void OnPointerUp(PointerEventData e) { _pressed = false; }
 
         private void Update()

@@ -71,22 +71,27 @@ namespace StumbleClone.UI
                 Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
             var heading = RuntimeUI.Label(bg.transform, "SETTINGS", 72,
-                new Vector2(0.5f, 0.9f), Vector2.zero, new Vector2(900f, 110f));
+                new Vector2(0.5f, 0.92f), Vector2.zero, new Vector2(900f, 110f));
             heading.fontStyle = FontStyles.Bold;
             heading.color = UITheme.Gold;
 
-            // Four rows, evenly spaced down the panel. Each row: caption + value readout + slider.
-            BuildVolumeRow(bg.transform, 0.72f, "MASTER VOLUME",
+            // Six rows, evenly spaced (0.10 apart) down the panel, ending clear of the Back button
+            // at 0.09. Slider rows: caption + value readout + slider. Toggle rows: caption + switch.
+            BuildVolumeRow(bg.transform, 0.78f, "MASTER VOLUME",
                 SettingsStore.MasterVolume, v => SettingsStore.MasterVolume = v);
-            BuildVolumeRow(bg.transform, 0.58f, "MUSIC VOLUME",
+            BuildVolumeRow(bg.transform, 0.68f, "MUSIC VOLUME",
                 SettingsStore.MusicVolume, v => SettingsStore.MusicVolume = v);
-            BuildVolumeRow(bg.transform, 0.44f, "SFX VOLUME",
+            BuildVolumeRow(bg.transform, 0.58f, "SFX VOLUME",
                 SettingsStore.SfxVolume, v => SettingsStore.SfxVolume = v);
-            BuildSensitivityRow(bg.transform, 0.30f, "LOOK SENSITIVITY",
+            BuildSensitivityRow(bg.transform, 0.48f, "LOOK SENSITIVITY",
                 SettingsStore.LookSensitivity, v => SettingsStore.LookSensitivity = v);
+            BuildToggleRow(bg.transform, 0.38f, "REDUCED MOTION",
+                SettingsStore.ReducedMotion, v => SettingsStore.ReducedMotion = v);
+            BuildToggleRow(bg.transform, 0.28f, "HIGH-CONTRAST HAZARDS",
+                SettingsStore.HighContrastTelegraphs, v => SettingsStore.HighContrastTelegraphs = v);
 
             RuntimeUI.Button(bg.transform, "Back", UITheme.Neutral,
-                new Vector2(0.5f, 0.1f), Vector2.zero, new Vector2(300f, 80f), Close);
+                new Vector2(0.5f, 0.09f), Vector2.zero, new Vector2(300f, 80f), Close);
         }
 
         // --- Rows ----------------------------------------------------------
@@ -113,6 +118,19 @@ namespace StumbleClone.UI
                 onChange(v);
                 readout.text = Mult(v);
             });
+        }
+
+        /// A boolean accessibility row: a left caption and a themed on/off toggle switch on the
+        /// right. onChange fires (and persists) on every flip.
+        private void BuildToggleRow(Transform parent, float anchorY, string caption,
+            bool value, Action<bool> onChange)
+        {
+            var label = RuntimeUI.Label(parent, caption, 34,
+                new Vector2(0.5f, anchorY), new Vector2(-260f, 0f), new Vector2(600f, 44f),
+                TextAlignmentOptions.Left);
+            label.color = UITheme.OnSurface;
+
+            BuildToggle(parent, anchorY, value, onChange);
         }
 
         /// Caption (left) + value readout (right) for a row; returns the readout label so the
@@ -185,6 +203,58 @@ namespace StumbleClone.UI
             slider.wholeNumbers = false;
             slider.SetValueWithoutNotify(value);
             slider.onValueChanged.AddListener(onChange);
+        }
+
+        // --- Toggle construction (pure code, themed pill switch) -----------
+
+        /// Build a UnityEngine.UI.Toggle styled as a rounded pill switch (track + sliding knob),
+        /// right-aligned in the row at anchorY. The track tints green when on / neutral when off,
+        /// and the gold knob slides to the lit side; onChange fires (persisted) on each flip.
+        private static void BuildToggle(Transform parent, float anchorY, bool value,
+            Action<bool> onChange)
+        {
+            const float trackWidth = 120f;
+            const float trackHeight = 56f;
+            const float knobSize = 44f;
+            const float knobInset = (trackHeight - knobSize) * 0.5f;
+            float knobTravel = trackWidth - knobSize - knobInset * 2f;
+
+            var go = new GameObject("Toggle", typeof(RectTransform));
+            var rt = (RectTransform)go.transform;
+            rt.SetParent(parent, false);
+            // Right-aligned in the row, matching where the slider readout sits.
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, anchorY);
+            rt.anchoredPosition = new Vector2(320f, 0f);
+            rt.sizeDelta = new Vector2(trackWidth, trackHeight);
+
+            // Track (the rounded pill background that recolours with state).
+            var track = MakeImage(rt, "Track", UITheme.Neutral, stretch: true);
+
+            // Knob (gold sliding circle); anchored left so we can lerp its X by state.
+            var knob = MakeImage(rt, "Knob", UITheme.Gold, stretch: false);
+            var knobRt = (RectTransform)knob.transform;
+            knobRt.anchorMin = knobRt.anchorMax = knobRt.pivot = new Vector2(0f, 0.5f);
+            knobRt.sizeDelta = new Vector2(knobSize, knobSize);
+
+            var toggle = go.AddComponent<Toggle>();
+            toggle.transition = Selectable.Transition.None;
+            toggle.targetGraphic = track;
+            toggle.isOn = value;
+
+            // Apply the visual state (track colour + knob position) and persist on change.
+            void ApplyVisual(bool on)
+            {
+                track.color = on ? UITheme.Success : UITheme.Neutral;
+                float x = on ? knobInset + knobTravel : knobInset;
+                knobRt.anchoredPosition = new Vector2(x, 0f);
+            }
+
+            ApplyVisual(value);
+            toggle.onValueChanged.AddListener(on =>
+            {
+                ApplyVisual(on);
+                onChange(on);
+            });
         }
 
         private static Image MakeImage(Transform parent, string name, Color color, bool stretch)

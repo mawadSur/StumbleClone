@@ -10,13 +10,17 @@ namespace StumbleClone.Game
     {
         private const string Prefix = "stumbleclone.settings.";
 
-        private const string MasterKey  = Prefix + "master";
-        private const string MusicKey   = Prefix + "music";
-        private const string SfxKey     = Prefix + "sfx";
-        private const string LookKey    = Prefix + "look";
+        private const string MasterKey         = Prefix + "master";
+        private const string MusicKey          = Prefix + "music";
+        private const string SfxKey            = Prefix + "sfx";
+        private const string LookKey           = Prefix + "look";
+        private const string ReducedMotionKey  = Prefix + "reducedmotion";
+        private const string HighContrastKey   = Prefix + "highcontrasttelegraphs";
 
         private const float DefaultVolume = 0.8f;
         private const float DefaultLook   = 1f;
+        private const bool  DefaultReducedMotion = false;
+        private const bool  DefaultHighContrast  = false;
 
         /// Minimum look-sensitivity multiplier the slider exposes.
         public const float LookMin = 0.5f;
@@ -52,6 +56,25 @@ namespace StumbleClone.Game
         {
             get => Mathf.Clamp(PlayerPrefs.GetFloat(LookKey, DefaultLook), LookMin, LookMax);
             set { PlayerPrefs.SetFloat(LookKey, Mathf.Clamp(value, LookMin, LookMax)); PlayerPrefs.Save(); }
+        }
+
+        /// Accessibility: when true, UI entrance animations are minimized (overlays fade in almost
+        /// instantly instead of scaling/easing) to reduce vestibular-trigger motion. Stored as a
+        /// PlayerPrefs int (0/1). Default false (full motion). Read by OverlayIntro.
+        public static bool ReducedMotion
+        {
+            get => PlayerPrefs.GetInt(ReducedMotionKey, DefaultReducedMotion ? 1 : 0) != 0;
+            set { PlayerPrefs.SetInt(ReducedMotionKey, value ? 1 : 0); PlayerPrefs.Save(); }
+        }
+
+        /// Accessibility: when true, hazard telegraphs use a bolder, higher-contrast treatment
+        /// (strong dark outline ring + brighter fill) so they read without relying on the
+        /// yellow→red colour cue alone. Stored as a PlayerPrefs int (0/1). Default false (standard
+        /// treatment, which still carries a shape cue). Read by TelegraphIndicator.
+        public static bool HighContrastTelegraphs
+        {
+            get => PlayerPrefs.GetInt(HighContrastKey, DefaultHighContrast ? 1 : 0) != 0;
+            set { PlayerPrefs.SetInt(HighContrastKey, value ? 1 : 0); PlayerPrefs.Save(); }
         }
     }
 }

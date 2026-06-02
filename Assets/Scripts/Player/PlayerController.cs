@@ -70,6 +70,24 @@ namespace StumbleClone.Player
         private bool _dashing;
         private float _dashUntil = float.NegativeInfinity;
 
+        // ---- Power-up buffs (additive; all neutral when inactive) ----
+        // Each buff is a timed multiplier (1 = no effect) plus an expiry stamp. They feed into
+        // the existing movement/jump code through small accessor helpers so the base logic is
+        // untouched when no buff is live. The shield is a one-use flag consumed by Knockback.
+        private float _speedMultiplier = 1f;
+        private float _speedBoostUntil = float.NegativeInfinity;
+        private float _jumpMultiplier = 1f;
+        private float _jumpBoostUntil = float.NegativeInfinity;
+        private bool _shieldActive;
+
+        /// Active planar speed cap — base moveSpeed scaled by any live SPEED buff. Used in place of
+        /// the raw moveSpeed everywhere the movement code clamps or targets run speed, so the boost
+        /// is transparent and reverts automatically the moment the timer lapses.
+        private float ActiveMoveSpeed => Time.time < _speedBoostUntil ? moveSpeed * _speedMultiplier : moveSpeed;
+
+        /// Active jump launch velocity — base jumpSpeed scaled by any live SUPER JUMP buff.
+        private float ActiveJumpSpeed => Time.time < _jumpBoostUntil ? jumpSpeed * _jumpMultiplier : jumpSpeed;
+
         public int RacerId => racerId;
         public string DisplayName => displayName;
         public Transform Transform => transform;
@@ -199,7 +217,7 @@ namespace StumbleClone.Player
             if (jumpBuffered && withinCoyote)
             {
                 Vector3 v = _rb.linearVelocity;
-                v.y = jumpSpeed;
+                v.y = ActiveJumpSpeed;
                 _rb.linearVelocity = v;
                 AudioManager.Play(Sfx.Jump);
                 // Consume both so a single press can't double-jump within the windows.
@@ -234,9 +252,10 @@ namespace StumbleClone.Player
                     // immediately (the body has no drag to bleed the burst off on its own).
                     Vector3 v = _rb.linearVelocity;
                     Vector3 planar = new Vector3(v.x, 0f, v.z);
-                    if (planar.magnitude > moveSpeed)
+                    float cap = ActiveMoveSpeed;
+                    if (planar.magnitude > cap)
                     {
-                        planar = planar.normalized * moveSpeed;
+                        planar = planar.normalized * cap;
                         v.x = planar.x;
                         v.z = planar.z;
                         _rb.linearVelocity = v;
@@ -303,17 +322,20 @@ namespace StumbleClone.Player
             Vector3 vel = _rb.linearVelocity;
             float planarSpeed = new Vector2(vel.x, vel.z).magnitude;
 
+            // SPEED buff scales the run cap transparently (== moveSpeed when no buff is live).
+            float activeMoveSpeed = ActiveMoveSpeed;
+
             // Don't override velocity while a knockback impulse is carrying the body:
             // either we're in the post-hit input lock, or we're moving faster than our
             // own run speed because something pushed us. Stomping x/z here is exactly
             // what killed the push mechanic (only the +Y survived). Let physics carry it;
             // drag/friction bleed the extra speed back down to moveSpeed.
             bool knockbackActive = Time.time < _inputLockUntil;
-            if (knockbackActive || planarSpeed > moveSpeed + 0.5f)
+            if (knockbackActive || planarSpeed > activeMoveSpeed + 0.5f)
                 return;
 
             Vector3 currentPlanar = new Vector3(vel.x, 0f, vel.z);
-            Vector3 targetPlanar = desired * moveSpeed;
+            Vector3 targetPlanar = desired * activeMoveSpeed;
             float accel = _grounded ? groundAcceleration : airAcceleration;
             Vector3 newPlanar = Vector3.MoveTowards(currentPlanar, targetPlanar, accel * Time.fixedDeltaTime);
 
@@ -384,10 +406,48 @@ namespace StumbleClone.Player
         public void Knockback(Vector3 force)
         {
             if (!IsAlive) return;
+            // SHIELD buff: absorb exactly one incoming hit, then expire. Consumed before any
+            // impulse / input lock / animation so the push reads as fully ignored.
+            if (_shieldActive)
+            {
+                _shieldActive = false;
+                return;
+            }
             _rb.AddForce(force + Vector3.up * GameConstants.KnockbackUpward, ForceMode.Impulse);
             _inputLockUntil = Time.time + inputLockOnKnockback;
             if (_animator != null) _animator.TriggerKnockedDown();
             AudioManager.Play(Sfx.Hit);
+        }
+
+        // ---- Power-up buff grants (called by Powerup pickups) ----
+
+        /// SPEED power-up: scale the player's run speed by <paramref name="multiplier"/> for
+        /// <paramref name="seconds"/>. Re-grants refresh the timer and adopt the new multiplier.
+        /// Reverts automatically — the movement code reads the scaled cap only while the timer holds.
+        /// <param name="multiplier">Run-speed scale (&gt; 1 = faster); clamped to at least 1.</param>
+        /// <param name="seconds">Duration in seconds the boost stays active.</param>
+        public void ApplySpeedBoost(float multiplier, float seconds)
+        {
+            _speedMultiplier = Mathf.Max(1f, multiplier);
+            _speedBoostUntil = Time.time + Mathf.Max(0f, seconds);
+        }
+
+        /// SHIELD power-up: arm a one-use guard that ignores the next <see cref="Knockback"/>.
+        /// The shield does not expire on a timer — it persists until a hit consumes it.
+        public void GrantShield()
+        {
+            _shieldActive = true;
+        }
+
+        /// SUPER JUMP power-up: scale the jump launch velocity by <paramref name="multiplier"/>
+        /// for <paramref name="seconds"/>. Affects jumps started while the timer holds; reverts
+        /// automatically afterward.
+        /// <param name="multiplier">Jump-velocity scale (&gt; 1 = higher); clamped to at least 1.</param>
+        /// <param name="seconds">Duration in seconds the boost stays active.</param>
+        public void GrantJumpBoost(float multiplier, float seconds)
+        {
+            _jumpMultiplier = Mathf.Max(1f, multiplier);
+            _jumpBoostUntil = Time.time + Mathf.Max(0f, seconds);
         }
 
         public void Eliminate()
@@ -437,6 +497,12 @@ namespace StumbleClone.Player
             _dashArmed = true;
             _dashing = false;
             _dashUntil = float.NegativeInfinity;
+            // Clear any in-flight power-up buffs so a respawn starts clean.
+            _speedMultiplier = 1f;
+            _speedBoostUntil = float.NegativeInfinity;
+            _jumpMultiplier = 1f;
+            _jumpBoostUntil = float.NegativeInfinity;
+            _shieldActive = false;
         }
     }
 }
