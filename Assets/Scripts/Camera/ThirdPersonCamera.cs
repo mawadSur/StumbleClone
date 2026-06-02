@@ -13,8 +13,8 @@ namespace StumbleClone.CameraRig
         [SerializeField] private Transform target;
 
         [Header("Framing")]
-        [SerializeField] private float distance = 5f;
-        [SerializeField] private float height = 2f;
+        [SerializeField] private float distance = 6.6f;
+        [SerializeField] private float height = 2.4f;
         [SerializeField] private float lateralOffset = 0f;
 
         [Header("Look")]
@@ -42,6 +42,12 @@ namespace StumbleClone.CameraRig
 
         private void Awake()
         {
+            // The Main Camera is baked into the scenes with the older, closer framing (distance 5,
+            // height 2). Floor it to the current pull-back here so the change takes effect without
+            // re-baking the binary scenes; a scene that bakes a wider value is still respected.
+            distance = Mathf.Max(distance, 6.6f);
+            height = Mathf.Max(height, 2.4f);
+
             _pitch = initialPitch;
             if (target != null)
             {

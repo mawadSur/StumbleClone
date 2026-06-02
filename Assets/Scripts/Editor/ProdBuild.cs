@@ -16,6 +16,9 @@ namespace StumbleClone.EditorTools
         [MenuItem("StumbleClone/Build/Prod Web (font + anim + WebGL)")]
         public static void WebGL()
         {
+            Debug.Log("[ProdBuild] Step 0 — force-include runtime shaders (sky + toon)");
+            ToonTools.EnsureAlwaysIncludedShaders();
+
             Debug.Log("[ProdBuild] Step 1/4 — UI font");
             UIFontBuilder.Run();
 

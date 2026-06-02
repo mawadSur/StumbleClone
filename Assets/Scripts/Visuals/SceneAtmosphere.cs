@@ -250,9 +250,18 @@ namespace StumbleClone.Visuals
             }
         }
 
-        // Matte, brightened (toon-ish) look without losing the texture; keeps the rig + clips.
+        // Resolved once: the cel/outline shader. Null only if it was stripped from the build
+        // (ToonTools.EnsureAlwaysIncludedShaders prevents that), in which case we fall back to the
+        // old matte+brighten so characters still look styled rather than broken.
+        private static Shader _toon;
+        private static bool _toonResolved;
+
+        // Full cartoon pass: swap each character material to the cel+outline toon shader (which
+        // also brightens/saturates the model's dark palette in-shader), keeping the rig + clips.
         private static void Flatten(GameObject root, float animatorSpeed)
         {
+            if (!_toonResolved) { _toon = Shader.Find("StumbleClone/Toon"); _toonResolved = true; }
+
             var renderers = root.GetComponentsInChildren<Renderer>(true);
             for (int r = 0; r < renderers.Length; r++)
             {
@@ -261,6 +270,16 @@ namespace StumbleClone.Visuals
                 {
                     var m = mats[i];
                     if (m == null) continue;
+
+                    if (_toon != null)
+                    {
+                        // Cel shading + black outline + brighten/saturate, all in-shader. Keep the
+                        // material's _BaseColor (the toon shader pops the dark palette itself).
+                        m.shader = _toon;
+                        continue;
+                    }
+
+                    // Fallback: matte + brighten on the stock shader.
                     if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", 0f);
                     if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.12f);
                     if (m.HasProperty("_Glossiness")) m.SetFloat("_Glossiness", 0.12f);

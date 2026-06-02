@@ -108,9 +108,17 @@ namespace StumbleClone.Bots
                 float aggression = BotDifficulty.Aggression;
                 bot.behavior = CreateBehavior(mode, skill);
                 if (bot.Agent != null)
+                {
+                    // Keep pace with the human: floor the base at the player's run speed (6) even for
+                    // low-skill bots (they used to bottom out ~0.85x = slower, which read as sluggish),
+                    // and let skill/aggression push them past it. Snappy accel + fast turning so they
+                    // don't arc around lazily and feel slow.
                     bot.Agent.speed = GameConstants.DefaultMoveSpeed
-                        * Mathf.Lerp(0.85f, 1.15f, skill)
-                        * Mathf.Lerp(1f, 1.3f, aggression); // aggressive bots close distance faster
+                        * Mathf.Lerp(1.0f, 1.28f, skill)
+                        * Mathf.Lerp(1f, 1.18f, aggression);
+                    bot.Agent.acceleration = 40f;
+                    bot.Agent.angularSpeed = 520f;
+                }
                 // Aggressive bots shove harder and far more often (half the cooldown, +30% force on Hard).
                 bot.SetCombatTuning(Mathf.Lerp(1f, 0.5f, aggression), Mathf.Lerp(1f, 1.3f, aggression));
 
