@@ -1,4 +1,5 @@
 using System.Collections;
+using StumbleClone.Audio;
 using StumbleClone.Bots;
 using StumbleClone.Player;
 using UnityEngine;
@@ -170,6 +171,7 @@ namespace StumbleClone.Obstacles
         private void Collect()
         {
             _collected = true;
+            AudioManager.Play(Sfx.Win); // little pickup pop
             var col = GetComponent<SphereCollider>();
             if (col != null) col.enabled = false;
             StartCoroutine(PopThenDestroy());

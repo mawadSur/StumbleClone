@@ -22,10 +22,13 @@ namespace StumbleClone.EditorTools
             Debug.Log("[ProdBuild] Step 2/4 — looping animations");
             AnimationLoopFixer.Run();
 
-            Debug.Log("[ProdBuild] Step 3/4 — character skins");
+            Debug.Log("[ProdBuild] Step 3/5 — character skins");
             SkinSetup.Run();
 
-            Debug.Log("[ProdBuild] Step 4/4 — WebGL build");
+            Debug.Log("[ProdBuild] Step 4/5 — app icon");
+            IconSetup.Run();
+
+            Debug.Log("[ProdBuild] Step 5/5 — WebGL build");
             PlatformBuilder.BuildWebGL(); // calls EditorApplication.Exit in batch mode
         }
     }

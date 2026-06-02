@@ -88,6 +88,17 @@ namespace StumbleClone.Player
         /// Active jump launch velocity — base jumpSpeed scaled by any live SUPER JUMP buff.
         private float ActiveJumpSpeed => Time.time < _jumpBoostUntil ? jumpSpeed * _jumpMultiplier : jumpSpeed;
 
+        // ---- Read-only buff state (for the HUD; additive, no behavior change) ----
+
+        /// True while the one-use SHIELD guard is armed (consumed by the next <see cref="Knockback"/>).
+        public bool ShieldActive => _shieldActive;
+
+        /// Seconds remaining on the SPEED buff, or 0 when inactive.
+        public float SpeedBoostRemaining => Mathf.Max(0f, _speedBoostUntil - Time.time);
+
+        /// Seconds remaining on the SUPER JUMP buff, or 0 when inactive.
+        public float JumpBoostRemaining => Mathf.Max(0f, _jumpBoostUntil - Time.time);
+
         public int RacerId => racerId;
         public string DisplayName => displayName;
         public Transform Transform => transform;
