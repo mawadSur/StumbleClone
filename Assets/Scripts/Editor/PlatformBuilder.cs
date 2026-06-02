@@ -117,7 +117,7 @@ namespace StumbleClone.EditorTools
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, BundleId);
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
-            PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel24;   // Android 7.0
+            PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel25;   // Android 7.1 (24 is now deprecated)
             PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevelAuto;
             PlayerSettings.Android.optimizedFramePacing = true;
         }
@@ -128,9 +128,11 @@ namespace StumbleClone.EditorTools
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.iOS, ScriptingImplementation.IL2CPP);
             PlayerSettings.iOS.targetOSVersionString = "13.0";
             PlayerSettings.iOS.targetDevice = iOSTargetDevice.iPhoneAndiPad;
-            // Required by App Store review even if the game never uses these.
-            PlayerSettings.iOS.cameraUsageDescription = "";
-            PlayerSettings.iOS.microphoneUsageDescription = "";
+            // The game uses neither camera nor microphone, so we deliberately do NOT set usage
+            // descriptions — adding empty NSCamera/NSMicrophone usage strings injects Info.plist
+            // keys with no purpose string, which App Store review rejects. Leave them unset.
+            // BundleId ("com.stumbleclone.game") is a placeholder — replace with the App ID
+            // registered in your Apple Developer account before an App Store submission.
         }
 
         // --- Build driver --------------------------------------------------

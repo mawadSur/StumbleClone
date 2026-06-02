@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using StumbleClone.Obstacles;
 
 namespace StumbleClone.Core
 {
@@ -13,6 +14,7 @@ namespace StumbleClone.Core
         public static event Action<IRacer> RacerEliminated;
         public static event Action<IRacer, int> RacerRankChanged; // (racer, rank starting at 1)
         public static event Action<float> SurvivalTimerTick;    // seconds remaining
+        public static event Action<string, SpawnDirection> WaveTelegraphed; // (patternName, rim direction)
 
         public static void RaiseLevelStarted(LevelMode mode) => LevelStarted?.Invoke(mode);
         public static void RaiseLevelEnded(IRacer winner) => LevelEnded?.Invoke(winner);
@@ -20,6 +22,11 @@ namespace StumbleClone.Core
         public static void RaiseRacerEliminated(IRacer r) => RacerEliminated?.Invoke(r);
         public static void RaiseRacerRankChanged(IRacer r, int rank) => RacerRankChanged?.Invoke(r, rank);
         public static void RaiseSurvivalTimerTick(float seconds) => SurvivalTimerTick?.Invoke(seconds);
+
+        /// Raised when a wave begins telegraphing, before its hazards spawn. `direction` is the
+        /// wave's leading rim octant so audio/UI can play a directional "tell".
+        public static void RaiseWaveTelegraphed(string patternName, SpawnDirection direction)
+            => WaveTelegraphed?.Invoke(patternName, direction);
 
         /// Clear all subscribers — call from scene unload guards to avoid stale references.
         public static void Reset()
@@ -30,6 +37,7 @@ namespace StumbleClone.Core
             RacerEliminated = null;
             RacerRankChanged = null;
             SurvivalTimerTick = null;
+            WaveTelegraphed = null;
         }
     }
 }

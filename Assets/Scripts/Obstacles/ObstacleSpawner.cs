@@ -28,6 +28,18 @@ namespace StumbleClone.Obstacles
         [Tooltip("Diameter of the ground telegraph disc shown before each hazard spawns.")]
         [SerializeField] private float telegraphSize = 4f;
 
+        [Header("Escalation")]
+        [Tooltip("Fraction of a pattern's telegraph lead kept at the top tier. Keeps late waves " +
+                 "learnable instead of unreadable — never drops below this.")]
+        [SerializeField, Range(0.4f, 1f)] private float minTelegraphLeadFactor = 0.65f;
+        [Tooltip("Rest gap between waves at the calmest moment (early game).")]
+        [SerializeField] private float maxRestGap = 2.6f;
+        [Tooltip("Rest gap between waves at peak intensity (late game).")]
+        [SerializeField] private float minRestGap = 0.6f;
+        [Tooltip("Tier at/above which waves may overlap: the next wave starts telegraphing " +
+                 "before the current one fully clears, so late-game pressure combos.")]
+        [SerializeField] private int comboTier = 2;
+
         // Fixed so the opening waves are the SAME every round → the player can learn them.
         private const int PatternSeed = 9173;
 
@@ -74,9 +86,16 @@ namespace StumbleClone.Obstacles
                 pattern.Build(entries, tier);
                 entries.Sort(CompareDelay);
 
-                float lead = pattern.TelegraphLead;
+                // Escalation: at higher tiers the telegraph gives a little less lead time, but
+                // never below minTelegraphLeadFactor so the wave stays readable and learnable.
+                float lead = pattern.TelegraphLead * LeadFactor(intensity);
                 Vector3 centerPos = _center != null ? _center.position : Vector3.zero;
                 float groundY = centerPos.y + 0.45f;
+
+                // Announce the wave so audio/UI can play a directional "tell". The first sorted
+                // entry is the leading hazard the player must read first.
+                if (entries.Count > 0)
+                    GameEvents.RaiseWaveTelegraphed(pattern.Name, entries[0].dir);
 
                 // Telegraph the whole wave up-front; each marker lives until its hazard lands.
                 for (int i = 0; i < entries.Count; i++)
@@ -98,11 +117,13 @@ namespace StumbleClone.Obstacles
                     spawnedAt = entries[i].delay;
 
                     Vector3 rim = ArenaDirections.RimPoint(centerPos, spawnRadius, entries[i].dir);
-                    SpawnTypeAt(entries[i].type, rim, speedScale, forceScale);
+                    SpawnTypeAt(entries[i].type, rim, speedScale, forceScale, entries[i].dir, centerPos);
                 }
 
-                // Breather between waves — shorter as the round heats up.
-                yield return new WaitForSeconds(Mathf.Lerp(2.6f, 0.8f, intensity));
+                // Breather between waves — shorter as the round heats up. Past the combo tier the
+                // rest is short enough that the next wave begins telegraphing while the current
+                // wave's hazards are still crossing the arena, so late-game pressure combos.
+                yield return new WaitForSeconds(RestGap(intensity, tier));
             }
         }
 
@@ -116,13 +137,28 @@ namespace StumbleClone.Obstacles
             return Mathf.Clamp01(0.5f * timeT + 0.5f * deathT);
         }
 
-        private void SpawnTypeAt(ObstacleType type, Vector3 rim, float speedScale, float forceScale)
+        /// Telegraph lead shrinks as intensity climbs but is floored at minTelegraphLeadFactor so
+        /// even the hardest waves can still be recognized and learned (the ROADMAP "learn" goal).
+        private float LeadFactor(float intensity) => Mathf.Lerp(1f, minTelegraphLeadFactor, intensity);
+
+        /// Rest gap between waves. Shrinks with intensity; at/above comboTier it is clamped tighter
+        /// so the next wave overlaps the tail of the current one for combined late-game pressure.
+        private float RestGap(float intensity, int tier)
+        {
+            float gap = Mathf.Lerp(maxRestGap, minRestGap, intensity);
+            if (tier >= comboTier)
+                gap = Mathf.Min(gap, Mathf.Lerp(minRestGap, 0f, intensity)); // allow overlap late
+            return Mathf.Max(0f, gap);
+        }
+
+        private void SpawnTypeAt(ObstacleType type, Vector3 rim, float speedScale, float forceScale,
+                                 SpawnDirection dir, Vector3 centerPos)
         {
             switch (type)
             {
-                case ObstacleType.RollingBoulder: SpawnBoulder(rim, speedScale, forceScale); break;
+                case ObstacleType.RollingBoulder: SpawnBoulder(rim, speedScale, forceScale, centerPos); break;
                 case ObstacleType.SlidingRam: SpawnRam(rim, speedScale, forceScale); break;
-                case ObstacleType.SweepingBar: SpawnSweep(rim, speedScale, forceScale); break;
+                case ObstacleType.SweepingBar: SpawnSweep(rim, speedScale, forceScale, dir); break;
                 case ObstacleType.BouncingBall: SpawnBall(rim, speedScale, forceScale); break;
                 case ObstacleType.StepBlocks: SpawnSteps(rim); break;
             }
@@ -130,7 +166,7 @@ namespace StumbleClone.Obstacles
 
         // ---- factory ------------------------------------------------------------
 
-        private void SpawnBoulder(Vector3 rim, float speedScale, float forceScale)
+        private void SpawnBoulder(Vector3 rim, float speedScale, float forceScale, Vector3 centerPos)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             go.name = "Boulder";
@@ -142,7 +178,11 @@ namespace StumbleClone.Obstacles
             rb.mass = 10f;
             rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
 
-            go.AddComponent<RollingBoulder>().Configure(_center, speedScale, forceScale);
+            var boulder = go.AddComponent<RollingBoulder>();
+            // Roll inward along the wave's rim direction instead of randomizing, so the boulder
+            // tracks its telegraph. Inward = from the rim toward the arena center.
+            boulder.SetLaunchDirection(centerPos - new Vector3(rim.x, centerPos.y, rim.z));
+            boulder.Configure(_center, speedScale, forceScale);
         }
 
         private void SpawnRam(Vector3 rim, float speedScale, float forceScale)
@@ -160,7 +200,7 @@ namespace StumbleClone.Obstacles
             go.AddComponent<SlidingRam>().Configure(_center, speedScale, forceScale);
         }
 
-        private void SpawnSweep(Vector3 rim, float speedScale, float forceScale)
+        private void SpawnSweep(Vector3 rim, float speedScale, float forceScale, SpawnDirection dir)
         {
             float length = Mathf.Min(spawnRadius, 10f);
             Vector3 centerPos = _center != null ? _center.position : Vector3.zero;
@@ -181,6 +221,9 @@ namespace StumbleClone.Obstacles
             go.AddComponent<Rigidbody>();
 
             var bar = go.AddComponent<SweepingBar>();
+            // Spin deterministically from the wave's rim octant (so the arc stops fighting the
+            // pattern): octants on the N→SE half sweep clockwise, the rest counter-clockwise.
+            bar.SetSpin(clockwise: (int)dir < ArenaDirections.Count / 2);
             bar.Configure(_center, speedScale, forceScale);
             bar.SetPivot(new Vector3(rim.x, go.transform.position.y, rim.z));
         }

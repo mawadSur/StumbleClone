@@ -12,6 +12,8 @@ namespace StumbleClone.Obstacles
         private Vector3 _pivot;
         private float _angularSpeed = 90f; // deg/s, sign set in Configure
         private bool _hasPivot;
+        private bool _hasExplicitSpin;
+        private float _explicitSign = 1f;
 
         protected override void OnEnable()
         {
@@ -28,10 +30,21 @@ namespace StumbleClone.Obstacles
             _hasPivot = true;
         }
 
+        /// Pins the sweep direction instead of randomizing it, so the bar's arc matches the
+        /// wave's intent. `clockwise` true sweeps clockwise (viewed from above), false counter.
+        /// Call before or after Configure — Configure re-reads this flag.
+        public void SetSpin(bool clockwise)
+        {
+            _explicitSign = clockwise ? -1f : 1f;
+            _hasExplicitSpin = true;
+            // Re-apply the sign to a magnitude already chosen by Configure.
+            _angularSpeed = Mathf.Abs(_angularSpeed) * _explicitSign;
+        }
+
         public override void Configure(Transform arenaCenter, float speedScale, float forceScale)
         {
             base.Configure(arenaCenter, speedScale, forceScale);
-            float sign = Random.value < 0.5f ? -1f : 1f;
+            float sign = _hasExplicitSpin ? _explicitSign : (Random.value < 0.5f ? -1f : 1f);
             _angularSpeed = 70f * Mathf.Max(0.5f, speedScale) * sign;
         }
 

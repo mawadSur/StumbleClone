@@ -6,6 +6,7 @@ using StumbleClone.Game;
 using StumbleClone.Player;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
 
 namespace StumbleClone.UI
@@ -109,6 +110,16 @@ namespace StumbleClone.UI
             string me = LeaderboardStore.GetPlayerName();
             var top = LeaderboardStore.GetTop(mode, 8);
 
+            // Gold NEW BEST! badge between the title and the position line when this winning run
+            // is the player's best ever for the mode.
+            if (IsNewBest(mode, me))
+            {
+                var badge = RuntimeUI.Label(_overlay.transform, "NEW BEST!", 60,
+                    new Vector2(0.5f, 0.83f), Vector2.zero, new Vector2(900f, 90f));
+                badge.fontStyle = FontStyles.Bold;
+                badge.color = UITheme.Gold;
+            }
+
             int pos = 0;
             for (int i = 0; i < top.Count; i++)
                 if (top[i] != null && top[i].playerName == me) { pos = i + 1; break; }
@@ -135,12 +146,54 @@ namespace StumbleClone.UI
                 new Vector2(0.5f, 0.45f), Vector2.zero, new Vector2(1000f, 540f));
             list.richText = true;
 
+            // SHARE sits on its own row above the primary actions so it never overlaps them.
+            int sharePos = pos;
+            RuntimeUI.Button(_overlay.transform, "SHARE", UITheme.Secondary,
+                new Vector2(0.5f, 0.235f), Vector2.zero, new Vector2(440f, 84f), () => OnShare(mode, sharePos));
+
             RuntimeUI.Button(_overlay.transform, "PLAY AGAIN", UITheme.Primary,
                 new Vector2(0.5f, 0.12f), new Vector2(-240f, 0f), new Vector2(440f, 92f), OnPlayAgain);
             RuntimeUI.Button(_overlay.transform, "MAIN MENU", UITheme.Neutral,
                 new Vector2(0.5f, 0.12f), new Vector2(240f, 0f), new Vector2(440f, 92f), OnMenu);
 
             OverlayIntro.Play(_overlay);
+        }
+
+        /// True if this winning run is the player's best ever score for the mode. The player won,
+        /// so GameManager already submitted the run (BuildSoon waits a frame for it); the run is
+        /// therefore the new best exactly when the player's top stored entry is this run — i.e. no
+        /// stored entry of theirs scores higher than this run's score.
+        private static bool IsNewBest(LevelMode mode, string me)
+        {
+            if (GameManager.Instance == null || GameManager.Instance.lastResult == null) return false;
+            float runScore = GameManager.Instance.lastResult.score;
+
+            float playerBest = float.MinValue;
+            // Pull the full retained set (50 == the per-mode cap) so a deep history can't hide the
+            // player's true best. GetTop is sorted high-to-low, so the first of the player's entries
+            // is their best.
+            var all = LeaderboardStore.GetTop(mode, 50);
+            for (int i = 0; i < all.Count; i++)
+            {
+                var e = all[i];
+                if (e != null && e.playerName == me) { playerBest = e.score; break; }
+            }
+            return playerBest == float.MinValue || runScore >= playerBest;
+        }
+
+        // Game URL the share links back to (the deployed WebGL build).
+        private const string ShareUrl = "https://stumbleclone.vercel.app";
+
+        /// Opens an X/Twitter web-intent pre-filled with a brag about this win. OpenURL works on
+        /// WebGL (new tab) and mobile (app/browser), so it stays cross-platform with no native plugin.
+        private static void OnShare(LevelMode mode, int pos)
+        {
+            string place = pos > 0 ? $"#{pos} on the {mode} leaderboard" : $"the {mode}";
+            string text = $"I just won {place} in StumbleClone! Can you beat me?";
+            string url = "https://twitter.com/intent/tweet?text="
+                         + UnityWebRequest.EscapeURL(text)
+                         + "&url=" + UnityWebRequest.EscapeURL(ShareUrl);
+            Application.OpenURL(url);
         }
 
         private static string Trunc(string s, int n)
