@@ -49,34 +49,38 @@ namespace StumbleClone.UI
             RuntimeUI.Panel(_overlay.transform, "Backdrop", new Color(0f, 0f, 0f, 0.72f),
                 Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
-            // Centered rounded card.
+            // Centered rounded card. Taller than wide so the title, control list, goal line and
+            // button each get their own band with no overlap (regions laid out top→bottom below).
             var card = RuntimeUI.Panel(_overlay.transform, "Card", UITheme.Surface,
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(-460f, -380f), new Vector2(460f, 380f));
+                new Vector2(-460f, -410f), new Vector2(460f, 410f));
             card.sprite = UITheme.RoundedSprite();
             card.type = UnityEngine.UI.Image.Type.Sliced;
 
-            var title = RuntimeUI.Label(card.transform, "HOW TO PLAY", 72,
-                new Vector2(0.5f, 1f), new Vector2(0f, -90f), new Vector2(840f, 110f));
+            // Title band: top of card, y ≈ [250, 340] in card space.
+            var title = RuntimeUI.Label(card.transform, "HOW TO PLAY", 68,
+                new Vector2(0.5f, 1f), new Vector2(0f, -70f), new Vector2(840f, 90f));
             title.fontStyle = FontStyles.Bold;
             title.color = UITheme.Gold;
 
-            // Concise control list covering keyboard/mouse and touch side by side.
+            // Control list band: card centre, y ≈ [-150, 210] — clears the title above.
             var controls = RuntimeUI.Label(card.transform, BuildControlsText(), 34,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, 24f), new Vector2(820f, 420f),
-                TextAlignmentOptions.TopLeft);
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 30f), new Vector2(820f, 360f),
+                TextAlignmentOptions.Top);
             controls.color = UITheme.OnSurface;
             controls.richText = true;
 
+            // Goal band: above the button, y ≈ [-240, -160] — clears the controls above.
             var goal = RuntimeUI.Label(card.transform,
                 "Goal: Be the <b>LAST one standing</b> — don't fall off, and stay inside the safe zone.",
-                30, new Vector2(0.5f, 0f), new Vector2(0f, 150f), new Vector2(820f, 80f),
+                30, new Vector2(0.5f, 0f), new Vector2(0f, 170f), new Vector2(820f, 80f),
                 TextAlignmentOptions.Top);
             goal.color = UITheme.OnSurfaceMuted;
             goal.richText = true;
 
+            // Button band: bottom of card, y ≈ [-350, -266] — clears the goal line above.
             RuntimeUI.Button(card.transform, "GOT IT!", UITheme.Primary,
-                new Vector2(0.5f, 0f), new Vector2(0f, 70f), new Vector2(360f, 84f), Dismiss);
+                new Vector2(0.5f, 0f), new Vector2(0f, 60f), new Vector2(360f, 84f), Dismiss);
 
             OverlayIntro.Play(_overlay);
         }
@@ -103,7 +107,9 @@ namespace StumbleClone.UI
         {
             PlayerPrefs.SetInt(SeenKey, 1);
             PlayerPrefs.Save();
-            if (_overlay != null) _overlay.SetActive(false);
+            // Destroy (not just deactivate) the overlay canvas so it doesn't linger as a dead,
+            // input-blocking GraphicRaycaster over the menu after the card is dismissed.
+            if (_overlay != null) Destroy(_overlay);
             Destroy(gameObject);
         }
     }

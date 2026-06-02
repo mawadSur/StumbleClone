@@ -31,7 +31,16 @@ namespace StumbleClone.UI
             if (Object.FindFirstObjectByType<EventSystem>() != null) return;
             var es = new GameObject("EventSystem");
             es.AddComponent<EventSystem>();
+            // The project ships with the new Input System (activeInputHandler = Input System only).
+            // A StandaloneInputModule reads via the legacy UnityEngine.Input API, which THROWS every
+            // frame under that backend — and that exception stalls the EventSystem/PlayerInput update,
+            // killing gameplay input (the "WASD doesn't move" bug). Use the Input System UI module,
+            // matching MvpBootstrap and MobileControls. Guarded so the old backend still compiles.
+#if ENABLE_INPUT_SYSTEM
+            es.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+#else
             es.AddComponent<StandaloneInputModule>();
+#endif
         }
 
         public static Image Panel(Transform parent, string name, Color color,
