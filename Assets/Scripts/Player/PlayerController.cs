@@ -44,8 +44,8 @@ namespace StumbleClone.Player
         [SerializeField] private float inputLockOnKnockback = 0.3f;
 
         [Header("Spawn Safety")]
-        [Tooltip("Seconds after spawn during which the player can't be eliminated; falls/pushes snap back to the spawn point instead. Guards against being shoved off the map by a spawn-frame collider overlap.")]
-        [SerializeField] private float spawnGrace = 1.5f;
+        [Tooltip("Settle window after spawn: the player can't be eliminated (falls snap back to spawn) AND ignores all knockback. Stops the round-start gang-up — in Knockout, 7 bots lock the human and shove them off the rim, and rim hazards arrive fast — from killing you before you can even start moving. Standing still still gets you eventually once this lapses; it just isn't an instant death.")]
+        [SerializeField] private float spawnGrace = 3f;
         [Tooltip("Log spawn diagnostics (ground below, overlapping colliders) once on Start.")]
         [SerializeField] private bool logSpawnDiagnostics = true;
 
@@ -417,6 +417,10 @@ namespace StumbleClone.Player
         public void Knockback(Vector3 force)
         {
             if (!IsAlive) return;
+            // Settle grace: ignore all pushes for the first moments after spawn so the round-start
+            // bot gang-up / early rim hazards can't shove a still-orienting player off the map. Does
+            // not consume the shield (a real hit after the grace still gets the guard).
+            if (Time.time < _spawnSafeUntil) return;
             // SHIELD buff: absorb exactly one incoming hit, then expire. Consumed before any
             // impulse / input lock / animation so the push reads as fully ignored.
             if (_shieldActive)
@@ -470,6 +474,21 @@ namespace StumbleClone.Player
             {
                 ReSnapToSpawn();
                 return;
+            }
+            if (logSpawnDiagnostics)
+            {
+                // One line that disambiguates the death cause on a playtest: fell off (low y) vs
+                // shoved off the edge (high planar speed / far from centre) vs zone/other (on-ground,
+                // slow — e.g. shrinking safe-zone or a manager call).
+                Vector3 p = transform.position;
+                Vector3 v = _rb != null ? _rb.linearVelocity : Vector3.zero;
+                float planarSpeed = new Vector2(v.x, v.z).magnitude;
+                float distFromCenter = new Vector2(p.x, p.z).magnitude;
+                Debug.LogWarning($"[PlayerDeath] pos={p:F1} y={p.y:F1} planarSpeed={planarSpeed:F1} " +
+                                 $"distFromCenter={distFromCenter:F1} vY={v.y:F1} — " +
+                                 (p.y < GameConstants.WorldKillY + 1f ? "fell below kill-Y (off the map)"
+                                  : planarSpeed > 4f ? "knocked off (high speed at death)"
+                                  : "eliminated while on-ground/slow (safe-zone or manager)"));
             }
             IsAlive = false;
             if (_collider != null) _collider.enabled = false;
