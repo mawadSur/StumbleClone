@@ -70,6 +70,10 @@ namespace StumbleClone.Player
         private bool _dashing;
         private float _dashUntil = float.NegativeInfinity;
 
+        // External downhill drift (planar m/s) from a tilting arena. Folded into the movement
+        // target so the strong ground-brake doesn't cancel it: idle => slide; steer uphill to hold.
+        private Vector3 _arenaSlide;
+
         // ---- Power-up buffs (additive; all neutral when inactive) ----
         // Each buff is a timed multiplier (1 = no effect) plus an expiry stamp. They feed into
         // the existing movement/jump code through small accessor helpers so the base logic is
@@ -347,6 +351,11 @@ namespace StumbleClone.Player
 
             Vector3 currentPlanar = new Vector3(vel.x, 0f, vel.z);
             Vector3 targetPlanar = desired * activeMoveSpeed;
+            // Arena tilt: add the downhill drift to the movement target so idle => slide and the
+            // player must steer uphill to hold. Grounded + past settle grace only, so spawn
+            // protection isn't undermined and you don't "slide" through the air.
+            if (_grounded && Time.time >= _spawnSafeUntil)
+                targetPlanar += _arenaSlide;
             float accel = _grounded ? groundAcceleration : airAcceleration;
             Vector3 newPlanar = Vector3.MoveTowards(currentPlanar, targetPlanar, accel * Time.fixedDeltaTime);
 
@@ -463,6 +472,15 @@ namespace StumbleClone.Player
         {
             _jumpMultiplier = Mathf.Max(1f, multiplier);
             _jumpBoostUntil = Time.time + Mathf.Max(0f, seconds);
+        }
+
+        /// Arena-tilt slide: a planar downhill drift (m/s) folded into the movement target so the
+        /// player slowly slides and must walk uphill to hold position. ArenaTilt sets it each frame
+        /// as the platform leans; pass Vector3.zero to clear. Only applied while grounded and past
+        /// the spawn settle-grace (see ApplyMovement).
+        public void SetArenaSlide(Vector3 planarVelocity)
+        {
+            _arenaSlide = new Vector3(planarVelocity.x, 0f, planarVelocity.z);
         }
 
         public void Eliminate()
