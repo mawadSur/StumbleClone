@@ -49,57 +49,65 @@ namespace StumbleClone.UI
             RuntimeUI.Panel(_overlay.transform, "Backdrop", new Color(0f, 0f, 0f, 0.72f),
                 Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
-            // Centered rounded card. Taller than wide so the title, control list, goal line and
-            // button each get their own band with no overlap (regions laid out top→bottom below).
+            // Centered rounded card. Tall enough that the title, control list, goal line and
+            // button each get their own horizontal band with clear gaps (laid out top→bottom
+            // below; card spans y ∈ [-450, 450] in its own space).
             var card = RuntimeUI.Panel(_overlay.transform, "Card", UITheme.Surface,
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(-460f, -410f), new Vector2(460f, 410f));
+                new Vector2(-460f, -450f), new Vector2(460f, 450f));
             card.sprite = UITheme.RoundedSprite();
             card.type = UnityEngine.UI.Image.Type.Sliced;
 
-            // Title band: top of card, y ≈ [250, 340] in card space.
+            // Title band: top of card, y ≈ [300, 390].
             var title = RuntimeUI.Label(card.transform, "HOW TO PLAY", 68,
-                new Vector2(0.5f, 1f), new Vector2(0f, -70f), new Vector2(840f, 90f));
+                new Vector2(0.5f, 1f), new Vector2(0f, -60f), new Vector2(840f, 90f));
             title.fontStyle = FontStyles.Bold;
             title.color = UITheme.Gold;
 
-            // Control list band: card centre, y ≈ [-150, 210] — clears the title above.
+            // Control list band: card centre, top edge y ≈ 205, flows down ~6–8 lines to ≈ -130.
+            // Rows are short one-liners (no wrapping) so the block height is predictable and stays
+            // clear of the goal line below.
             var controls = RuntimeUI.Label(card.transform, BuildControlsText(), 34,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, 30f), new Vector2(820f, 360f),
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(820f, 330f),
                 TextAlignmentOptions.Top);
             controls.color = UITheme.OnSurface;
             controls.richText = true;
 
-            // Goal band: above the button, y ≈ [-240, -160] — clears the controls above.
+            // Goal band: above the button, top edge y ≈ -209 — clears the controls above.
             var goal = RuntimeUI.Label(card.transform,
                 "Goal: Be the <b>LAST one standing</b> — don't fall off, and stay inside the safe zone.",
-                30, new Vector2(0.5f, 0f), new Vector2(0f, 170f), new Vector2(820f, 80f),
+                30, new Vector2(0.5f, 0f), new Vector2(0f, 165f), new Vector2(820f, 76f),
                 TextAlignmentOptions.Top);
             goal.color = UITheme.OnSurfaceMuted;
             goal.richText = true;
 
-            // Button band: bottom of card, y ≈ [-350, -266] — clears the goal line above.
+            // Button band: bottom of card, y ≈ [-395, -309] — clears the goal line above.
             RuntimeUI.Button(card.transform, "GOT IT!", UITheme.Primary,
-                new Vector2(0.5f, 0f), new Vector2(0f, 60f), new Vector2(360f, 84f), Dismiss);
+                new Vector2(0.5f, 0f), new Vector2(0f, 55f), new Vector2(360f, 86f), Dismiss);
 
             OverlayIntro.Play(_overlay);
         }
 
-        /// One control per line: action, then keyboard/mouse, then the touch equivalent.
+        /// One control per line (action + keys), kept short so no row wraps at the card width.
+        /// A single muted mobile note follows so touch players aren't left out.
         private static string BuildControlsText()
         {
             string muted = ColorUtility.ToHtmlStringRGB(UITheme.OnSurfaceMuted);
             string Row(string action, string keys) =>
                 $"<b>{action}</b>   <color=#{muted}>{keys}</color>";
 
-            return string.Join("\n\n", new[]
+            string rows = string.Join("\n", new[]
             {
-                Row("Move", "WASD / left stick  (left side of screen on mobile)"),
-                Row("Look", "Mouse / drag  (right side on mobile)"),
-                Row("Jump", "Space / jump button"),
-                Row("Dash", "double-tap jump in the air"),
-                Row("Push", "Left-click / push button"),
+                Row("Move", "WASD / Left Stick"),
+                Row("Look", "Mouse / Drag"),
+                Row("Jump", "Space"),
+                Row("Dash", "Double-tap Jump (in air)"),
+                Row("Push", "Left-Click"),
             });
+
+            // Blank line, then a compact mobile hint in muted text.
+            return rows +
+                $"\n\n<color=#{muted}>On mobile: left side moves, right side looks, on-screen buttons jump & push.</color>";
         }
 
         /// Hide the overlay and persist the "seen" flag so it never appears again.
