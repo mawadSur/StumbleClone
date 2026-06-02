@@ -17,6 +17,10 @@ namespace StumbleClone.Game
 
         public Transform ArenaCenter => arenaCenter;
 
+        /// Rim radius where hazards spawn — read by ArenaShrinker to derive the
+        /// shrinking safe radius (it pulls this in slightly to sit on solid ground).
+        public float ArenaRadius => arenaRadius;
+
         private bool _ended;
         private ObstacleSpawner _spawner;
 

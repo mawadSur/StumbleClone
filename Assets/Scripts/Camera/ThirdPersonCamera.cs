@@ -1,4 +1,5 @@
 using StumbleClone.Core;
+using StumbleClone.Game;
 using StumbleClone.Player;
 using UnityEngine;
 
@@ -82,6 +83,9 @@ namespace StumbleClone.CameraRig
             float lookScale = (_input != null && _input.LookFromGamepad)
                 ? gamepadLookSpeed * Time.deltaTime
                 : mouseSensitivity;
+            // Player-tunable look-speed multiplier from the Settings menu. Applies uniformly to
+            // mouse, gamepad, and touch (touch feeds the gamepad rightStick path).
+            lookScale *= SettingsStore.LookSensitivity;
             _yaw += look.x * lookScale;
             _pitch -= look.y * lookScale;
             _pitch = Mathf.Clamp(_pitch, pitchMin, pitchMax);

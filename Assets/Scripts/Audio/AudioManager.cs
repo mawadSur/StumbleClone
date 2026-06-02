@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using StumbleClone.Game;
 using UnityEngine;
 
 namespace StumbleClone.Audio
@@ -50,7 +51,10 @@ namespace StumbleClone.Audio
             var src = _pool[_next];
             _next = (_next + 1) % _pool.Count;
             src.pitch = pitch;
-            src.PlayOneShot(clip, Mathf.Clamp01(sfxVolume * volumeScale));
+            // Player-facing trims from the Settings menu: Master is the global output level, Sfx the
+            // per-channel level. sfxVolume stays as the built-in per-clip mix baseline.
+            float settingsScale = SettingsStore.MasterVolume * SettingsStore.SfxVolume;
+            src.PlayOneShot(clip, Mathf.Clamp01(sfxVolume * volumeScale * settingsScale));
         }
 
         /// Null-safe static helper so call sites stay one-liners.

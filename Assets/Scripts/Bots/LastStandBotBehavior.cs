@@ -72,12 +72,22 @@ namespace StumbleClone.Bots
                 return;
             }
 
-            float distFromCenter = _arenaCenter != null
-                ? Vector3.Distance(new Vector3(pos.x, _arenaCenter.position.y, pos.z), _arenaCenter.position)
-                : 0f;
-            float safeRing = _arenaRadius * _safeRingFraction;
+            // Prefer the shrinking safe-zone when it's live: feed bots the closing
+            // radius + centre so they retreat as the ring contracts. Otherwise fall
+            // back to the static arena ring this bot was constructed with.
+            bool shrinkActive = ArenaShrinker.Active;
+            Vector3 ringCenter = shrinkActive
+                ? ArenaShrinker.Center
+                : (_arenaCenter != null ? _arenaCenter.position : pos);
+            // The shrinker's CurrentSafeRadius is already the *safe* radius (its own
+            // fraction baked in), so don't re-apply _safeRingFraction to it.
+            float effectiveRadius = shrinkActive ? ArenaShrinker.CurrentSafeRadius : _arenaRadius;
+            float safeRing = shrinkActive ? effectiveRadius : _arenaRadius * _safeRingFraction;
+
+            float distFromCenter = Vector3.Distance(
+                new Vector3(pos.x, ringCenter.y, pos.z), ringCenter);
             // Aggressive bots will chase past the safe ring (to shove the victim off at the rim).
-            float huntRing = Mathf.Lerp(safeRing, _arenaRadius * 0.96f, _aggression);
+            float huntRing = Mathf.Lerp(safeRing, effectiveRadius * 0.96f, _aggression);
 
             // 2) Pick a victim — prefer the human player, increasingly so with aggression.
             IRacer target = SelectTarget(bot, pos, out bool targetIsPlayer);
@@ -106,8 +116,10 @@ namespace StumbleClone.Bots
                 }
             }
 
-            // 4) Nothing to chase — keep to safe ground.
-            if (_arenaCenter != null) bot.SetDestination(_arenaCenter.position);
+            // 4) Nothing to chase — keep to safe ground. Steer to the (shrinking) ring
+            //    centre so bots actively pull inward as the zone closes; if already well
+            //    inside, holding the centre is harmless.
+            if (shrinkActive || _arenaCenter != null) bot.SetDestination(ringCenter);
         }
 
         /// Choose who to chase. The human player is preferred within a lock range that grows with
