@@ -83,6 +83,21 @@ namespace StumbleClone.UI
             RefreshTokens();
             RefreshSkinRow();
 
+            // Daily login reward — the "come back tomorrow" hook. Claimed once per UTC day on the
+            // first menu visit; pays into the token wallet and flashes a toast under the chip.
+            if (DailyRewardStore.RewardAvailable)
+            {
+                int amount = DailyRewardStore.TryClaim(out int streak);
+                if (amount > 0)
+                {
+                    RefreshTokens();
+                    var toast = RuntimeUI.Label(bg.transform, $"DAILY BONUS  +{amount}   (Day {streak} streak!)", 30,
+                        new Vector2(1f, 1f), new Vector2(-40f, -96f), new Vector2(560f, 48f), TextAlignmentOptions.Right);
+                    toast.color = UITheme.Gold;
+                    toast.fontStyle = FontStyles.Bold;
+                }
+            }
+
             // Bot difficulty — tap to cycle Easy / Normal / Hard. Persisted for every round.
             var diffBtn = RuntimeUI.Button(bg.transform, "BOTS: " + BotDifficulty.Label,
                 UITheme.Neutral,
