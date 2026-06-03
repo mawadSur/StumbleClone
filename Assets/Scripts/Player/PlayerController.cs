@@ -53,7 +53,7 @@ namespace StumbleClone.Player
 
         private Rigidbody _rb;
         private CapsuleCollider _collider;
-        private PlayerInputHandler _input;
+        private IPlayerInput _input;
         private PlayerAnimator _animator;
         private Transform _cameraTransform;
         private float _inputLockUntil;
@@ -130,6 +130,14 @@ namespace StumbleClone.Player
             groundMask &= ~selfLayers;
             if (groundMask == 0)
                 groundMask = (1 << GameConstants.LayerGround) | (1 << GameConstants.LayerObstacle);
+        }
+
+        /// Replace the input source — e.g. a NetworkInputProvider for a remote player in multiplayer.
+        /// Defaults to the local PlayerInputHandler resolved in Awake. Multiplayer Phase-0 seam; has
+        /// no effect on single-player (nothing calls it yet).
+        public void SetInputSource(IPlayerInput source)
+        {
+            if (source != null) _input = source;
         }
 
         private void Start()

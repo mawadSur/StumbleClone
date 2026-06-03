@@ -6,7 +6,7 @@ namespace StumbleClone.Player
     /// Thin wrapper around UnityEngine.InputSystem.PlayerInput so other scripts
     /// can query input without taking a dependency on the InputSystem types.
     [RequireComponent(typeof(PlayerInput))]
-    public sealed class PlayerInputHandler : MonoBehaviour
+    public sealed class PlayerInputHandler : MonoBehaviour, IPlayerInput
     {
         private const string GameplayMap = "Gameplay";
 
