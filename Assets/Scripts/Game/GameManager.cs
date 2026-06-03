@@ -74,10 +74,13 @@ namespace StumbleClone.Game
             lastResult = new LevelResult(currentMode, winner, playerWon, playerRank, duration);
 
             // Token reward — only for runs the human player took part in. Winning pays the full
-            // purse; merely surviving to the end pays a consolation. Spent in the title-screen shop.
+            // purse; merely surviving to the end pays a consolation. A Token Doubler consumable (if
+            // the player owns a charge) doubles a win. Spent in the title-screen shop.
             if (player != null)
             {
-                TokenWallet.Add(playerWon ? GameConstants.TokensForWin : GameConstants.TokensForFinish);
+                int reward = playerWon ? GameConstants.TokensForWin : GameConstants.TokensForFinish;
+                if (playerWon && AbilityStore.ConsumeDoubler()) reward *= 2;
+                TokenWallet.Add(reward);
             }
 
             // Record to the local leaderboard — only for runs the human player took part in.

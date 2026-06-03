@@ -104,12 +104,14 @@ namespace StumbleClone.UI
                 new Vector2(0.5f, 0.39f), Vector2.zero, new Vector2(460f, 64f), OnCycleDifficulty);
             _difficultyLabel = diffBtn.GetComponentInChildren<TMP_Text>();
 
-            // PLAY drops straight into the deathmatch (the focused mode) — no second menu.
-            // Single primary CTA (pink); leaderboard is the subordinate secondary action (purple).
+            // PLAY opens the mode picker (Knockout free; Race/Survival are token-unlocks).
+            // Single primary CTA (pink). Below it: PERKS shop + LEADERBOARD share a row.
             RuntimeUI.Button(bg.transform, "PLAY", UITheme.Primary,
                 new Vector2(0.5f, 0.27f), Vector2.zero, new Vector2(440f, 92f), OnPlay);
+            RuntimeUI.Button(bg.transform, "PERKS", UITheme.Secondary,
+                new Vector2(0.5f, 0.13f), new Vector2(-125f, 0f), new Vector2(290f, 66f), OpenPerksPanel);
             RuntimeUI.Button(bg.transform, "LEADERBOARD", UITheme.Secondary,
-                new Vector2(0.5f, 0.13f), Vector2.zero, new Vector2(440f, 66f), OnLeaderboard);
+                new Vector2(0.5f, 0.13f), new Vector2(125f, 0f), new Vector2(290f, 66f), OnLeaderboard);
 
             OverlayIntro.Play(_overlay);
         }
@@ -175,13 +177,153 @@ namespace StumbleClone.UI
         private void OnPlay()
         {
             if (_nameInput != null) LeaderboardStore.SetPlayerName(_nameInput.text);
-            if (GameManager.Instance != null) GameManager.Instance.LoadLevel(LevelMode.LastStanding);
-            else if (_overlay != null) _overlay.SetActive(false); // editor-direct fallback
+            OpenModePanel();
         }
 
         private void OnLeaderboard()
         {
             if (LeaderboardUI.Instance != null) LeaderboardUI.Instance.Open();
+        }
+
+        // ---- Modal panels (mode select, perks shop) -----------------------------
+
+        // A centred dimmed card above the title. Returns the modal root (destroy to close) and the
+        // card transform to parent content into.
+        private GameObject BuildModal(string titleText, out Transform card)
+        {
+            var modal = RuntimeUI.Overlay("ModalOverlay", 120);
+            RuntimeUI.Panel(modal.transform, "Dim", new Color(0f, 0f, 0f, 0.72f),
+                Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            var cardImg = RuntimeUI.Panel(modal.transform, "Card", UITheme.SurfaceDeep,
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-380f, -400f), new Vector2(380f, 400f));
+            var title = RuntimeUI.Label(cardImg.transform, titleText, 56,
+                new Vector2(0.5f, 1f), new Vector2(0f, -28f), new Vector2(700f, 80f));
+            title.fontStyle = FontStyles.Bold;
+            title.color = UITheme.Gold;
+            card = cardImg.transform;
+            return modal;
+        }
+
+        private void OpenModePanel()
+        {
+            var modal = BuildModal("SELECT MODE", out Transform card);
+
+            var tok = RuntimeUI.Label(card, "TOKENS: " + TokenWallet.Balance, 30,
+                new Vector2(0.5f, 1f), new Vector2(0f, -112f), new Vector2(620f, 40f));
+            tok.color = UITheme.Gold;
+
+            LevelMode[] modes = { LevelMode.LastStanding, LevelMode.Race, LevelMode.Survival };
+            float y = -180f;
+            foreach (var modeItem in modes)
+            {
+                LevelMode mode = modeItem; // capture per iteration
+                var btn = RuntimeUI.Button(card, "", UITheme.Secondary,
+                    new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(640f, 78f), null);
+                var lbl = btn.GetComponentInChildren<TMP_Text>();
+                var img = btn.GetComponent<Image>();
+                SetModeLabel(lbl, img, mode);
+                btn.onClick.AddListener(() => OnModeChosen(mode, lbl, img, tok, modal));
+                y -= 98f;
+            }
+
+            RuntimeUI.Button(card, "BACK", UITheme.Neutral,
+                new Vector2(0.5f, 0f), new Vector2(0f, 42f), new Vector2(300f, 64f), () => Destroy(modal));
+        }
+
+        private void SetModeLabel(TMP_Text lbl, Image img, LevelMode mode)
+        {
+            bool unlocked = LevelProgress.IsUnlocked(mode);
+            string name = LevelProgress.DisplayName(mode).ToUpper();
+            if (lbl != null)
+                lbl.text = unlocked ? ("PLAY " + name) : (name + "   -   UNLOCK " + LevelProgress.PriceOf(mode));
+            if (img != null)
+                img.color = unlocked ? UITheme.Primary
+                    : (TokenWallet.CanAfford(LevelProgress.PriceOf(mode)) ? UITheme.Secondary : UITheme.Neutral);
+        }
+
+        private void OnModeChosen(LevelMode mode, TMP_Text lbl, Image img, TMP_Text tok, GameObject modal)
+        {
+            if (LevelProgress.IsUnlocked(mode))
+            {
+                if (GameManager.Instance != null) { Destroy(modal); GameManager.Instance.LoadLevel(mode); }
+                else if (_overlay != null) { Destroy(modal); _overlay.SetActive(false); } // editor-direct fallback
+                return;
+            }
+
+            // Locked: try to buy the unlock; on success the button flips to PLAY.
+            if (LevelProgress.TryUnlock(mode))
+            {
+                SetModeLabel(lbl, img, mode);
+                RefreshTokens();
+                if (tok != null) tok.text = "TOKENS: " + TokenWallet.Balance;
+            }
+        }
+
+        private void OpenPerksPanel()
+        {
+            var modal = BuildModal("ABILITIES", out Transform card);
+
+            var tok = RuntimeUI.Label(card, "TOKENS: " + TokenWallet.Balance, 30,
+                new Vector2(0.5f, 1f), new Vector2(0f, -112f), new Vector2(620f, 40f));
+            tok.color = UITheme.Gold;
+
+            var rows = new System.Collections.Generic.List<(string id, TMP_Text lbl, Image img)>();
+            TMP_Text doublerLabel = null;
+
+            System.Action refresh = () =>
+            {
+                foreach (var r in rows) SetPerkLabel(r.lbl, r.img, r.id);
+                if (doublerLabel != null) doublerLabel.text = DoublerText();
+                if (tok != null) tok.text = "TOKENS: " + TokenWallet.Balance;
+                RefreshTokens();
+            };
+
+            float y = -168f;
+            for (int i = 0; i < AbilityStore.PerkCount; i++)
+            {
+                string id = AbilityStore.PerkIds[i]; // capture
+                var btn = RuntimeUI.Button(card, "", UITheme.Secondary,
+                    new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(660f, 70f), null);
+                var lbl = btn.GetComponentInChildren<TMP_Text>();
+                var img = btn.GetComponent<Image>();
+                lbl.fontSize = 26f;
+                rows.Add((id, lbl, img));
+                btn.onClick.AddListener(() => { OnPerkClicked(id); refresh(); });
+                y -= 84f;
+            }
+
+            // Consumable: Token Doubler.
+            var dblBtn = RuntimeUI.Button(card, "", UITheme.Secondary,
+                new Vector2(0.5f, 1f), new Vector2(0f, y - 8f), new Vector2(660f, 70f), null);
+            doublerLabel = dblBtn.GetComponentInChildren<TMP_Text>();
+            doublerLabel.fontSize = 26f;
+            dblBtn.onClick.AddListener(() => { AbilityStore.BuyDoubler(); refresh(); });
+
+            refresh();
+
+            RuntimeUI.Button(card, "BACK", UITheme.Neutral,
+                new Vector2(0.5f, 0f), new Vector2(0f, 42f), new Vector2(300f, 64f), () => Destroy(modal));
+        }
+
+        private static string DoublerText()
+            => "TOKEN DOUBLER  x" + AbilityStore.DoublerCount + "   [BUY " + AbilityStore.DoublerPrice + "]";
+
+        private void SetPerkLabel(TMP_Text lbl, Image img, string id)
+        {
+            int idx = AbilityStore.PerkIndex(id);
+            bool owned = AbilityStore.IsPerkOwned(id);
+            bool equipped = AbilityStore.EquippedPerk == id;
+            string state = !owned ? ("UNLOCK " + AbilityStore.PerkPrice(idx)) : (equipped ? "EQUIPPED" : "EQUIP");
+            if (lbl != null) lbl.text = AbilityStore.PerkNames[idx] + " - " + AbilityStore.PerkDesc[idx] + "   [" + state + "]";
+            if (img != null)
+                img.color = equipped ? UITheme.Primary
+                    : (!owned && !TokenWallet.CanAfford(AbilityStore.PerkPrice(idx)) ? UITheme.Neutral : UITheme.Secondary);
+        }
+
+        private void OnPerkClicked(string id)
+        {
+            if (AbilityStore.IsPerkOwned(id)) AbilityStore.EquippedPerk = id;        // equip
+            else if (AbilityStore.BuyPerk(id)) AbilityStore.EquippedPerk = id;       // buy then equip
         }
     }
 }
