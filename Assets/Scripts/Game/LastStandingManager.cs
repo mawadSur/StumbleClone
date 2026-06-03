@@ -17,8 +17,9 @@ namespace StumbleClone.Game
 
         public Transform ArenaCenter => arenaCenter;
 
-        /// Rim radius where hazards spawn — read by ArenaShrinker to derive the
-        /// shrinking safe radius (it pulls this in slightly to sit on solid ground).
+        /// Fallback rim radius for hazard spawning when the platform is NOT shrinking.
+        /// Once ArenaShrinker is live it overrides this with the platform's real, closing
+        /// edge (measured from the Arena geometry), so hazards track the visible floor.
         public float ArenaRadius => arenaRadius;
 
         private bool _ended;

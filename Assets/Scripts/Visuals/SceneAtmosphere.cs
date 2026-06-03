@@ -10,12 +10,15 @@ namespace StumbleClone.Visuals
 {
     /// Self-bootstrapping art pass — no scene wiring, works on the already-baked binary scenes.
     ///
-    /// Bright, cartoony "Stumble Guys" art direction — sunny daytime, candy-saturated colours.
-    ///  * Sky: a procedurally generated daytime gradient panorama (light sky-blue overhead →
-    ///    pale near-white at the horizon) with soft fluffy white clouds and a gentle sun glow,
-    ///    applied as the skybox. No stars, nothing dark.
-    ///  * Lighting: warm, sunny daylight — a bright slightly-warm ambient fill plus a warm-white
-    ///    key light at higher intensity (a sunny afternoon, not a night club).
+    /// Cartoony "Stumble Guys" art direction with a NIGHT sky — a black starfield overhead,
+    /// candy-saturated characters that still pop under the toon shader.
+    ///  * Sky: a procedurally generated night panorama (near-black blue-black background with a
+    ///    faintly-lighter band at the horizon) covered in a dense field of stars (random
+    ///    white/pale-blue dots of varied size + brightness, a handful brighter) plus a soft moon
+    ///    glow disc, applied as the skybox. The black-with-stars look the user asked for.
+    ///  * Lighting: moonlit night — a cool dim-but-readable blue-grey ambient fill (NOT pitch
+    ///    black; characters/ground stay clearly visible) plus a cool "moonlight" key light at a
+    ///    lower intensity than the old warm sun.
     ///  * Characters: flattens the player + bots to a matte, vivid candy-toy look while keeping
     ///    their textures and rigged animations; boosts colour saturation/brightness and bumps
     ///    animator speed slightly for a lighter, peppier feel.
@@ -70,14 +73,16 @@ namespace StumbleClone.Visuals
 
         private void ApplySky()
         {
-            _skyTex = BuildDaytimePanorama(1024, 512);
+            _skyTex = BuildNightPanorama(1024, 512);
 
             Shader sh = Shader.Find("Skybox/Panoramic");
             if (sh != null)
             {
                 _skyMat = new Material(sh);
                 _skyMat.SetTexture("_MainTex", _skyTex);
-                if (_skyMat.HasProperty("_Exposure")) _skyMat.SetFloat("_Exposure", 1.25f);
+                // Lower exposure for the night mood — the stars stay bright relative to the
+                // near-black background, but the sky doesn't wash out to grey.
+                if (_skyMat.HasProperty("_Exposure")) _skyMat.SetFloat("_Exposure", 0.9f);
                 RenderSettings.skybox = _skyMat;
                 DynamicGI.UpdateEnvironment();
             }
@@ -175,9 +180,10 @@ namespace StumbleClone.Visuals
                       $"RenderSettings.skybox shader={boundShader}, cameras seen={maxCameras}");
         }
 
-        // Equirectangular (lat-long) panorama: bright daytime gradient + sun glow + fluffy clouds.
-        // v runs 0 (horizon) → 1 (overhead). No stars, nothing dark.
-        private static Texture2D BuildDaytimePanorama(int w, int h)
+        // Equirectangular (lat-long) panorama: a NIGHT sky — near-black blue-black background with a
+        // faintly-lighter band hugging the horizon, a dense starfield, and a soft moon glow disc.
+        // u wraps seamlessly; v runs 0 (horizon) → 1 (zenith). "The black one with stars."
+        private static Texture2D BuildNightPanorama(int w, int h)
         {
             var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
             tex.wrapModeU = TextureWrapMode.Repeat;  // horizontal wraps seamlessly
@@ -185,77 +191,114 @@ namespace StumbleClone.Visuals
             tex.filterMode = FilterMode.Bilinear;
 
             var px = new Color[w * h];
-            Color horizon = new Color(0.93f, 0.96f, 0.99f); // pale near-white at the horizon
-            Color zenith  = new Color(0.36f, 0.66f, 0.97f); // cheerful light sky-blue overhead
-            Color sun     = new Color(1.00f, 0.98f, 0.86f); // soft warm sun glow
+            // Very dark blue-black overhead; the horizon band is only a touch lighter so the dome
+            // still reads as a deep night sky rather than washing out to grey.
+            Color zenith  = new Color(0.015f, 0.020f, 0.045f); // near-black blue-black at the zenith
+            Color horizon = new Color(0.040f, 0.055f, 0.095f); // subtle slightly-lighter horizon band
 
-            const float sx = 0.70f, sy = 0.78f; // sun centre in uv (high, off to one side)
             for (int y = 0; y < h; y++)
             {
                 float v = y / (h - 1f);
-                // Ease the gradient so most of the dome is blue and the pale band hugs the horizon.
-                float t = Mathf.Pow(v, 0.65f);
+                // Keep the horizon lift confined to the lowest slice; the bulk of the dome is black.
+                float t = Mathf.Pow(v, 0.5f);
                 Color baseCol = Color.Lerp(horizon, zenith, t);
-                for (int x = 0; x < w; x++)
-                {
-                    float du = (x / (w - 1f)) - sx;
-                    float dv = v - sy;
-                    float d = Mathf.Sqrt(du * du * 2.2f + dv * dv); // horizontally stretched glow
-                    float g = Mathf.Clamp01(1f - d / 0.45f);
-                    g *= g;
-                    Color c = baseCol + sun * (g * 0.55f);
-                    px[y * w + x] = new Color(Mathf.Min(c.r, 1f), Mathf.Min(c.g, 1f), Mathf.Min(c.b, 1f));
-                }
+                int row = y * w;
+                for (int x = 0; x < w; x++) px[row + x] = baseCol;
             }
 
-            AddClouds(px, w, h);
+            AddMoon(px, w, h);
+            AddStars(px, w, h);
 
             tex.SetPixels(px);
             tex.Apply(false, false);
             return tex;
         }
 
-        // Soft fluffy white clouds: scattered blobs, each a cluster of overlapping radial puffs.
-        // Clouds sit in the lower-to-mid sky band so they read against the blue without crowding
-        // the zenith.
-        private static void AddClouds(Color[] px, int w, int h)
+        // A soft moon glow disc: a bright pale-white core fading into a wide cool halo, sat high in
+        // the sky off to one side. Additive toward white so it lifts the black behind it.
+        private static void AddMoon(Color[] px, int w, int h)
         {
-            const int clouds = 26;
-            for (int c = 0; c < clouds; c++)
+            float mx = 0.72f * (w - 1f);  // moon centre in pixels (high, off to one side)
+            float my = 0.80f * (h - 1f);
+            float core = 26f;             // bright disc radius
+            float halo = 110f;            // soft glow radius
+            Color moon = new Color(0.92f, 0.94f, 1.00f); // cool pale moonlight
+
+            int r = Mathf.CeilToInt(halo);
+            for (int dy = -r; dy <= r; dy++)
             {
-                int cx = Random.Range(0, w);
-                int cy = (int)(Random.Range(0.20f, 0.62f) * (h - 1)); // low/mid sky band
-                int puffs = Random.Range(4, 8);
-                float scale = Random.Range(0.7f, 1.5f);
-                for (int p = 0; p < puffs; p++)
+                int y = (int)my + dy;
+                if (y < 0 || y >= h) continue;
+                for (int dx = -r; dx <= r; dx++)
                 {
-                    int ox = cx + (int)(Random.Range(-34f, 34f) * scale);
-                    int oy = cy + (int)(Random.Range(-10f, 10f) * scale);
-                    float radius = Random.Range(16f, 30f) * scale;
-                    AddPuff(px, w, h, ox, oy, radius);
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                    // Bright solid-ish core, then a smooth halo falloff that fades to nothing.
+                    float a;
+                    if (dist <= core) a = Mathf.Lerp(1f, 0.7f, dist / core);
+                    else
+                    {
+                        float hd = Mathf.Clamp01(1f - (dist - core) / (halo - core));
+                        a = 0.7f * hd * hd; // quadratic falloff = soft glow
+                    }
+                    if (a <= 0f) continue;
+                    int x = (int)mx + dx;
+                    if (x < 0) x += w; else if (x >= w) x -= w; // wrap horizontally
+                    int idx = y * w + x;
+                    px[idx] = Color.Lerp(px[idx], moon, a);
                 }
             }
         }
 
-        // One soft white radial puff, blended additively-toward-white with a smooth falloff.
-        private static void AddPuff(Color[] px, int w, int h, int cx, int cy, float radius)
+        // A dense field of stars: a few hundred small white/pale-blue dots of varied brightness and
+        // size, plus a handful of brighter "beacon" stars with a tiny glow. Each star is drawn as a
+        // crisp filled dot (clearly a star, not noise) over the black background.
+        private static void AddStars(Color[] px, int w, int h)
         {
-            int r = Mathf.CeilToInt(radius);
-            float inv = 1f / radius;
+            const int stars = 520; // a few hundred, dense across the whole dome
+            for (int s = 0; s < stars; s++)
+            {
+                int cx = Random.Range(0, w);
+                // Bias slightly toward the upper sky but still seed plenty near the horizon.
+                int cy = (int)(Random.Range(0.04f, 1.0f) * (h - 1));
+
+                // Most stars are dim+tiny; a handful are bright beacons with a small glow.
+                bool bright = Random.value < 0.06f;          // ~30 brighter stars
+                float intensity = bright ? Random.Range(0.95f, 1.0f) : Random.Range(0.45f, 0.9f);
+                float radius = bright ? Random.Range(1.6f, 2.6f) : Random.Range(0.6f, 1.4f);
+
+                // Slight white/pale-blue colour variation per star.
+                Color tint = Random.value < 0.35f
+                    ? new Color(0.82f, 0.88f, 1.00f)  // pale blue
+                    : new Color(1.00f, 0.99f, 0.96f); // warm white
+                DrawStar(px, w, h, cx, cy, radius, tint, intensity, bright);
+            }
+        }
+
+        // One star: a bright dot core with a 1px soft edge so it stays crisp at panorama scale.
+        // Bright beacons get an extra faint glow ring so they read as standout stars.
+        private static void DrawStar(Color[] px, int w, int h, int cx, int cy, float radius, Color tint, float intensity, bool bright)
+        {
+            float glow = bright ? radius * 2.6f : radius + 0.8f;
+            int r = Mathf.CeilToInt(glow);
             for (int dy = -r; dy <= r; dy++)
             {
                 int y = cy + dy;
                 if (y < 0 || y >= h) continue;
                 for (int dx = -r; dx <= r; dx++)
                 {
-                    float dist = Mathf.Sqrt(dx * dx + dy * dy) * inv;
-                    if (dist >= 1f) continue;
-                    float a = 1f - dist;
-                    a = a * a * 0.9f; // smooth, soft edge
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                    float a;
+                    if (dist <= radius) a = intensity;                       // crisp filled core
+                    else if (dist <= glow)                                   // soft edge / glow ring
+                    {
+                        float fade = 1f - (dist - radius) / (glow - radius);
+                        a = intensity * fade * fade * (bright ? 0.55f : 0.6f);
+                    }
+                    else continue;
                     int x = cx + dx;
                     if (x < 0) x += w; else if (x >= w) x -= w; // wrap horizontally
                     int idx = y * w + x;
-                    px[idx] = Color.Lerp(px[idx], Color.white, a);
+                    px[idx] = Color.Lerp(px[idx], tint, Mathf.Clamp01(a));
                 }
             }
         }
@@ -265,15 +308,16 @@ namespace StumbleClone.Visuals
         private void ApplyLighting()
         {
             RenderSettings.ambientMode = AmbientMode.Flat;
-            // Bright, slightly-warm fill — a sunny afternoon sky bounce, not a dim default.
-            RenderSettings.ambientLight = new Color(0.78f, 0.80f, 0.74f);
+            // Cool moonlit fill — dim but READABLE blue-grey (~0.42 brightness), NOT pitch black, so
+            // the toon-shaded characters and ground stay clearly visible against the night sky.
+            RenderSettings.ambientLight = new Color(0.36f, 0.40f, 0.50f);
             RenderSettings.fog = false;
 
             foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None))
             {
                 if (l.type != LightType.Directional) continue;
-                l.color = new Color(1f, 0.97f, 0.88f);          // warm-white sunlight
-                l.intensity = Mathf.Max(l.intensity, 1.45f);    // bright key light
+                l.color = new Color(0.66f, 0.74f, 0.95f);       // cool blue-white moonlight
+                l.intensity = 0.85f;                            // lower than the old warm sun
                 break;
             }
         }

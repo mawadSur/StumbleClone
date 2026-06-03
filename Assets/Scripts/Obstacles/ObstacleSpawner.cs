@@ -89,7 +89,11 @@ namespace StumbleClone.Obstacles
                 // Escalation: at higher tiers the telegraph gives a little less lead time, but
                 // never below minTelegraphLeadFactor so the wave stays readable and learnable.
                 float lead = pattern.TelegraphLead * LeadFactor(intensity);
-                Vector3 centerPos = _center != null ? _center.position : Vector3.zero;
+                // Spawn from the LIVE platform rim: when ArenaShrinker is closing the floor, read
+                // its current edge so hazards arrive from the real, shrinking lip — not the stale
+                // serialized radius (which would drop them mid-platform as the floor pulls in).
+                Vector3 centerPos = CurrentCenter();
+                float rimRadius = CurrentRimRadius();
                 float groundY = centerPos.y + 0.45f;
 
                 // Announce the wave so audio/UI can play a directional "tell". The first sorted
@@ -100,7 +104,7 @@ namespace StumbleClone.Obstacles
                 // Telegraph the whole wave up-front; each marker lives until its hazard lands.
                 for (int i = 0; i < entries.Count; i++)
                 {
-                    Vector3 rim = ArenaDirections.RimPoint(centerPos, spawnRadius, entries[i].dir);
+                    Vector3 rim = ArenaDirections.RimPoint(centerPos, rimRadius, entries[i].dir);
                     TelegraphIndicator.Spawn(rim, groundY, lead + entries[i].delay, telegraphSize);
                 }
 
@@ -116,7 +120,10 @@ namespace StumbleClone.Obstacles
                     if (wait > 0f) yield return new WaitForSeconds(wait);
                     spawnedAt = entries[i].delay;
 
-                    Vector3 rim = ArenaDirections.RimPoint(centerPos, spawnRadius, entries[i].dir);
+                    // Reuse the wave's rim snapshot (same centerPos/rimRadius the telegraph used)
+                    // so each hazard lands where its marker promised, even though the platform has
+                    // shrunk a little during the telegraph lead.
+                    Vector3 rim = ArenaDirections.RimPoint(centerPos, rimRadius, entries[i].dir);
                     SpawnTypeAt(entries[i].type, rim, speedScale, forceScale, entries[i].dir, centerPos);
                 }
 
@@ -128,6 +135,33 @@ namespace StumbleClone.Obstacles
         }
 
         private static int CompareDelay(SpawnEntry a, SpawnEntry b) => a.delay.CompareTo(b.delay);
+
+        /// Margin (metres) by which the spawn rim sits OUTSIDE the live platform edge, so hazards
+        /// enter from just beyond the lip and roll inward across the floor rather than appearing
+        /// on top of racers at the rim.
+        private const float RimOutsideMargin = 1.5f;
+
+        /// Centre to spawn around. Tracks ArenaShrinker's live platform centre when the shrinker
+        /// is active; otherwise the serialized arenaCenter (or origin).
+        private Vector3 CurrentCenter()
+        {
+            if (ArenaShrinker.Active) return ArenaShrinker.Center;
+            return _center != null ? _center.position : Vector3.zero;
+        }
+
+        /// Radius to spawn hazards at. When the platform is shrinking, sit just OUTSIDE its live
+        /// edge so hazards arrive from the real, closing rim. Otherwise use the static spawnRadius
+        /// the manager configured. Never smaller than a tiny floor so a fully-closed disc still
+        /// spawns sane hazards.
+        private float CurrentRimRadius()
+        {
+            if (ArenaShrinker.Active)
+            {
+                float edge = ArenaShrinker.CurrentSafeRadius;
+                if (edge > 0.1f) return Mathf.Max(2f, edge + RimOutsideMargin);
+            }
+            return spawnRadius;
+        }
 
         private float ComputeIntensity()
         {
@@ -202,8 +236,10 @@ namespace StumbleClone.Obstacles
 
         private void SpawnSweep(Vector3 rim, float speedScale, float forceScale, SpawnDirection dir)
         {
-            float length = Mathf.Min(spawnRadius, 10f);
-            Vector3 centerPos = _center != null ? _center.position : Vector3.zero;
+            // Cap the bar by the LIVE rim so it reaches roughly to centre but doesn't massively
+            // overhang the far edge once the platform has shrunk.
+            float length = Mathf.Min(CurrentRimRadius(), 10f);
+            Vector3 centerPos = CurrentCenter();
             Vector3 inward = centerPos - rim; inward.y = 0f;
             if (inward.sqrMagnitude < 0.0001f) inward = Vector3.forward;
             inward.Normalize();
