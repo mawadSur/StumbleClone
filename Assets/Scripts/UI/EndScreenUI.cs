@@ -107,6 +107,19 @@ namespace StumbleClone.UI
             if (statsText != null)
             {
                 statsText.text = "Mode: " + lastMode;
+
+                // Show the token payout for this run on its own gold line under the mode. Reads the
+                // actual granted amount from the run result (rank-scaled consolation, since the win
+                // path is handled by VictoryScreen). Rich-text color overrides the muted base style.
+                if (GameManager.Instance != null && GameManager.Instance.lastResult != null)
+                {
+                    int tokens = GameManager.Instance.lastResult.tokensAwarded;
+                    if (tokens > 0)
+                    {
+                        statsText.richText = true;
+                        statsText.text += "\n<color=#FFD24D>+" + tokens + " TOKENS</color>";
+                    }
+                }
             }
 
             if (newBestBadge != null) newBestBadge.gameObject.SetActive(newBest);

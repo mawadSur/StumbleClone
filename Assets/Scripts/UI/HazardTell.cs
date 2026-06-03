@@ -31,6 +31,8 @@ namespace StumbleClone.UI
         // ---- Pooled UI (built once, reused every event) --------------------
         private RectTransform _bar;     // the glowing indicator, re-anchored per direction
         private Image _barImage;
+        private RectTransform _label;   // the wave-name caption, re-anchored alongside the bar
+        private TMPro.TMP_Text _labelText;
 
         // ---- Active flash state --------------------------------------------
         private bool _flashing;
@@ -79,8 +81,18 @@ namespace StumbleClone.UI
             AudioManager.Play(Sfx.Start, volumeScale: 0.85f, pitch: 1.35f);
 
             PlaceBar(dir);
+            ShowWaveName(patternName); // surface the incoming wave's name alongside the edge tell
             _flashing = true;
             _elapsed = 0f; // restart the flash even if one is mid-fade (honor rapid telegraphs)
+        }
+
+        // Put the wave name on the caption near the indicator (uppercased for a punchy alert read).
+        // Empty/blank names simply leave the caption hidden — the caption shares the flash envelope
+        // driven in Update, so no extra animation state is needed here.
+        private void ShowWaveName(string patternName)
+        {
+            if (_labelText == null) return;
+            _labelText.text = string.IsNullOrWhiteSpace(patternName) ? "" : patternName.ToUpper();
         }
 
         // ---- Per-frame flash animation -------------------------------------
@@ -101,15 +113,27 @@ namespace StumbleClone.UI
             c.a *= alpha;
             _barImage.color = c;
 
+            // The wave-name caption shares the bar's brightness envelope and tint so it punches in
+            // and fades out as one tell. White core keeps it readable over the amber→red bar.
+            if (_labelText != null)
+            {
+                var lc = Color.white;
+                lc.a = alpha;
+                _labelText.color = lc;
+            }
+
             if (!SettingsStore.ReducedMotion)
             {
                 // Slide the bar in from just off the edge, easing to rest as it brightens.
                 float slide = 1f - (1f - Mathf.Min(t / 0.25f, 1f));
-                _bar.anchoredPosition = Vector2.Lerp(_fromPos, _restPos, Mathf.SmoothStep(0f, 1f, slide));
+                Vector2 pos = Vector2.Lerp(_fromPos, _restPos, Mathf.SmoothStep(0f, 1f, slide));
+                _bar.anchoredPosition = pos;
+                if (_label != null) _label.anchoredPosition = pos; // caption rides in with the bar
             }
             else
             {
                 _bar.anchoredPosition = _restPos; // fade only — no sliding/scaling
+                if (_label != null) _label.anchoredPosition = _restPos;
             }
 
             if (t >= 1f)
@@ -117,6 +141,7 @@ namespace StumbleClone.UI
                 _flashing = false;
                 var hidden = _barImage.color; hidden.a = 0f;
                 _barImage.color = hidden;
+                if (_labelText != null) { var lh = _labelText.color; lh.a = 0f; _labelText.color = lh; }
             }
         }
 
@@ -151,6 +176,14 @@ namespace StumbleClone.UI
             _bar.anchorMin = _bar.anchorMax = _bar.pivot = anchor;
             _bar.localRotation = Quaternion.Euler(0f, 0f, rotationZ);
 
+            // The caption tracks the bar's edge anchor + orientation so the name reads centered on
+            // the indicator regardless of which edge/corner the wave is telegraphed from.
+            if (_label != null)
+            {
+                _label.anchorMin = _label.anchorMax = _label.pivot = anchor;
+                _label.localRotation = Quaternion.Euler(0f, 0f, rotationZ);
+            }
+
             // Rest position: sit flush against the edge with no offset (anchored to the edge itself).
             _restPos = Vector2.zero;
             _fromPos = _restPos + inward * -SlideDistance; // start further OUT, slide inward
@@ -158,7 +191,9 @@ namespace StumbleClone.UI
             _flashColor = HazardColor(dir);
 
             // Make the bar visible immediately at its start pose so the first frame is correct.
-            _bar.anchoredPosition = SettingsStore.ReducedMotion ? _restPos : _fromPos;
+            Vector2 startPos = SettingsStore.ReducedMotion ? _restPos : _fromPos;
+            _bar.anchoredPosition = startPos;
+            if (_label != null) _label.anchoredPosition = startPos;
         }
 
         /// Amber→red warning tint. Diagonals lean a touch hotter (more red) than the cardinals to
@@ -191,6 +226,29 @@ namespace StumbleClone.UI
             _barImage.raycastTarget = false;
             var start = UITheme.Accent; start.a = 0f;
             _barImage.color = start; // hidden until the first telegraph
+
+            BuildLabel(overlay.transform);
+        }
+
+        // The wave-name caption: a centered TMP label sized to the bar's long axis so it reads as a
+        // banner sitting on the indicator. Re-anchored/rotated per direction in PlaceBar and faded
+        // in/out by the shared envelope in Update. Hidden (alpha 0) until the first telegraph.
+        private void BuildLabel(Transform overlayRoot)
+        {
+            var labelGo = new GameObject("HazardLabel", typeof(RectTransform));
+            _label = (RectTransform)labelGo.transform;
+            _label.SetParent(overlayRoot, false);
+            _label.sizeDelta = new Vector2(BarLength, BarThickness);
+
+            _labelText = labelGo.AddComponent<TMPro.TextMeshProUGUI>();
+            _labelText.text = "";
+            _labelText.fontSize = 48f;
+            _labelText.fontStyle = TMPro.FontStyles.Bold;
+            _labelText.alignment = TMPro.TextAlignmentOptions.Center;
+            _labelText.raycastTarget = false;
+            UITheme.ApplyFont(_labelText);
+            var hidden = Color.white; hidden.a = 0f;
+            _labelText.color = hidden; // hidden until the first telegraph
         }
     }
 }

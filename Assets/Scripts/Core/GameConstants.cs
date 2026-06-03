@@ -23,6 +23,9 @@ namespace StumbleClone.Core
         // Racer tuning
         public const float DefaultMoveSpeed = 6f;
         public const float DefaultJumpSpeed = 8f;
+        // Extra downward gravity applied while falling (vel.y < 0) so jumps don't float down
+        // weightlessly — the rise stays satisfying, the fall gets punchy. 1 = normal gravity.
+        public const float FallMultiplier = 2.2f;
         public const float DefaultPushForce = 12f;
         public const float DefaultPushRange = 1.4f;
         public const float DefaultPushCooldown = 0.8f;

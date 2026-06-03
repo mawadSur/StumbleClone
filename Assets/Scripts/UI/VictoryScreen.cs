@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Text;
+using StumbleClone.Audio;
 using StumbleClone.CameraRig;
 using StumbleClone.Core;
 using StumbleClone.Game;
@@ -130,6 +131,32 @@ namespace StumbleClone.UI
             RuntimeUI.Label(_overlay.transform, posLine, 44,
                 new Vector2(0.5f, 0.76f), Vector2.zero, new Vector2(1500f, 70f));
 
+            // Gold token payout line under the placement, with a quick count-up. Reads the actual
+            // granted amount from the run result; if the Token Doubler fired, a smaller subline
+            // spells out the base x2 math so the bonus is legible.
+            var result = GameManager.Instance != null ? GameManager.Instance.lastResult : null;
+            int tokens = result != null ? result.tokensAwarded : 0;
+            if (tokens > 0)
+            {
+                var tokenLine = RuntimeUI.Label(_overlay.transform, $"+{tokens} TOKENS", 56,
+                    new Vector2(0.5f, 0.69f), Vector2.zero, new Vector2(900f, 80f));
+                tokenLine.fontStyle = FontStyles.Bold;
+                tokenLine.color = UITheme.Gold;
+                StartCoroutine(CountUpTokens(tokenLine, tokens));
+
+                if (result.doublerUsed)
+                {
+                    int baseTokens = tokens / 2;
+                    var doublerLine = RuntimeUI.Label(_overlay.transform,
+                        $"TOKEN DOUBLER!  base {baseTokens} x2 = {tokens}", 34,
+                        new Vector2(0.5f, 0.645f), Vector2.zero, new Vector2(1100f, 54f));
+                    doublerLine.fontStyle = FontStyles.Bold;
+                    doublerLine.color = UITheme.Accent;
+                }
+
+                AudioManager.Play(Sfx.Win);
+            }
+
             var sb = new StringBuilder();
             if (top.Count == 0)
                 sb.Append("No scores yet — you're the first!");
@@ -157,6 +184,29 @@ namespace StumbleClone.UI
                 new Vector2(0.5f, 0.12f), new Vector2(240f, 0f), new Vector2(440f, 92f), OnMenu);
 
             OverlayIntro.Play(_overlay);
+        }
+
+        /// Quick count-up so the gold payout reads as a reward instead of snapping. Uses unscaled
+        /// time (the game is effectively paused on the victory screen) and ease-out so it settles on
+        /// the final amount. Honors Reduced Motion by skipping straight to the total.
+        private IEnumerator CountUpTokens(TMPro.TMP_Text label, int total)
+        {
+            if (label == null) yield break;
+            if (SettingsStore.ReducedMotion) { label.text = $"+{total} TOKENS"; yield break; }
+
+            const float Duration = 0.6f;
+            float t = 0f;
+            while (t < Duration)
+            {
+                t += Time.unscaledDeltaTime;
+                float k = Mathf.Clamp01(t / Duration);
+                float e = 1f - Mathf.Pow(1f - k, 3f); // ease-out cubic
+                int shown = Mathf.Clamp(Mathf.RoundToInt(total * e), 0, total);
+                if (label == null) yield break;
+                label.text = $"+{shown} TOKENS";
+                yield return null;
+            }
+            if (label != null) label.text = $"+{total} TOKENS";
         }
 
         /// True if this winning run is the player's best ever score for the mode. The player won,

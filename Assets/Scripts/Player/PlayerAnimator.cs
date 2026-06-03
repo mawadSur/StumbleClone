@@ -1,4 +1,5 @@
 using StumbleClone.Animation;
+using StumbleClone.Audio;
 using StumbleClone.Core;
 using UnityEngine;
 
@@ -24,8 +25,15 @@ namespace StumbleClone.Player
 
         private const float DashLungeDur = 0.28f;
         private const float PushDur = 0.25f;
+        private const float LandDur = 0.30f;
+
+        // Landing feedback thresholds: downward contact speeds below SoftLandSpeed read as a light
+        // step (quiet, low squash); at/above HardLandSpeed they read as a full thud (loud, deep squash).
+        private const float SoftLandSpeed = 4f;
+        private const float HardLandSpeed = 12f;
 
         private bool _wasGrounded = true;
+        private float _prevAirborneFallSpeed; // |vel.y| cached each airborne frame for impact scaling
         private ProceduralCharacterAnimator _proc;
 
         // Dash-lunge overlay for the REAL-animator path: the shipped controller has no "Dash"
@@ -39,6 +47,8 @@ namespace StumbleClone.Player
         private bool _visualCaptured;
         private float _dashLunge;
         private float _pushTimer;
+        private float _landTimer;
+        private float _landImpact = 1f;
         private bool _victory;
 
         private void Awake()
@@ -74,6 +84,13 @@ namespace StumbleClone.Player
 
             bool grounded = controller != null && controller.IsGrounded;
             bool justJumped = _wasGrounded && !grounded && v.y > 0.1f;
+            bool justLanded = !_wasGrounded && grounded;
+
+            // While airborne, remember how fast we're dropping so the moment we touch down we can
+            // scale the landing feedback by the speed AT CONTACT (post-land vel.y is ~0 and useless).
+            if (!grounded) _prevAirborneFallSpeed = Mathf.Max(0f, -v.y);
+
+            if (justLanded) HandleLanding(_prevAirborneFallSpeed);
 
             if (_proc != null)
             {
@@ -134,6 +151,22 @@ namespace StumbleClone.Player
                 _visual.localRotation = _visualBaseRot * Quaternion.Euler(28f * s, 0f, 0f);
                 _visual.localScale = _visualBaseScale;
                 if (_pushTimer <= 0f) RestoreBase();
+                return;
+            }
+
+            if (_landTimer > 0f) // touchdown squash — compress down on impact, spring back
+            {
+                _landTimer -= dt;
+                float l = 1f - Mathf.Clamp01(_landTimer / LandDur); // 0 -> 1
+                float s = Mathf.Sin(l * Mathf.PI);                  // 0 -> 1 -> 0
+                float k = s * _landImpact;
+                _visual.localPosition = _visualBasePos - Vector3.up * (0.12f * k);
+                _visual.localRotation = _visualBaseRot;
+                _visual.localScale = new Vector3(
+                    _visualBaseScale.x * (1f + 0.12f * k),
+                    _visualBaseScale.y * (1f - 0.20f * k),
+                    _visualBaseScale.z * (1f + 0.12f * k));
+                if (_landTimer <= 0f) RestoreBase();
             }
         }
 
@@ -148,6 +181,35 @@ namespace StumbleClone.Player
         {
             if (_proc != null) _proc.NotifyKnockedDown();
             else if (animator != null) animator.SetTrigger(HashKnockedDown);
+        }
+
+        // Airborne -> grounded transition. Plays the Land SFX and a touchdown squash, both scaled by
+        // the downward speed at contact: a soft step under ~SoftLandSpeed barely registers, a hard
+        // fall above ~HardLandSpeed lands a loud, deep thud. fallSpeed is |vel.y| (>= 0).
+        private void HandleLanding(float fallSpeed)
+        {
+            // 0 at a soft touch-down, 1 at a hard slam — drives both volume/pitch and squash depth.
+            float impact = Mathf.Clamp01(Mathf.InverseLerp(SoftLandSpeed, HardLandSpeed, fallSpeed));
+
+            // Skip the SFX on near-zero-speed transitions (e.g. stepping off a tiny lip, ground
+            // jitter) so we don't spam a footstep every frame the ground check flickers.
+            if (fallSpeed > 0.75f)
+            {
+                float volume = Mathf.Lerp(0.35f, 1f, impact);
+                float pitch = Mathf.Lerp(1.1f, 0.85f, impact); // heavier landings sound lower
+                AudioManager.Play(Sfx.Land, volume, pitch);
+            }
+
+            TriggerLand(impact);
+        }
+
+        // Landing squash on the active visual path. Procedural fallback gets NotifyLand; the
+        // real-animator path runs its own overlay timer in LateUpdate.
+        private void TriggerLand(float impact)
+        {
+            if (_proc != null) { _proc.NotifyLand(impact); return; }
+            _landImpact = Mathf.Clamp01(impact);
+            _landTimer = LandDur;
         }
 
         public void TriggerDash()

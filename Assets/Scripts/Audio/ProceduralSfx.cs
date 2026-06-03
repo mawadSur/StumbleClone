@@ -60,6 +60,19 @@ namespace StumbleClone.Audio
                     return Tone("sfx_start", 0.2f, t =>
                         (Sine(t, 523f) + Sine(t, 784f) * 0.6f) * Bell(t, 0.2f) * 0.45f);
 
+                // Airy whoosh: filtered-feeling noise swelling under a bell, plus a quick
+                // downward pitch fall for "air rushing past". Distinct from Jump's rising boop.
+                case Sfx.Dash:
+                    return Tone("sfx_dash", 0.22f, t =>
+                        (Noise() * 0.6f + Sine(t, Mathf.Lerp(640f, 220f, Mathf.Clamp01(t / 0.22f))) * 0.3f)
+                        * Bell(t, 0.22f) * 0.5f);
+
+                // Bright two-note up-blip (E6 -> B6, a perfect fifth) — coin/pickup chime.
+                // Each note gets its own soft envelope so it sparkles without start-clicks,
+                // and it stays short so it never reads as the longer triumphant Win arpeggio.
+                case Sfx.Pickup:
+                    return Tone("sfx_pickup", 0.16f, t => PickupBlip(t));
+
                 default:
                     return Tone("sfx_blip", 0.06f, t => Sine(t, 440f) * Env(t, 0.06f, 0.002f, 20f, 0.012f));
             }
@@ -117,6 +130,18 @@ namespace StumbleClone.Audio
             // Per-note bell so each step swells and fades instead of snapping on a hard boundary.
             float local = t - idx * step;
             return Sine(t, notes[idx]) * Bell(local, step) * 0.6f;
+        }
+
+        /// Quick two-note rising chime (E6 -> B6, a perfect fifth) for coin/pickup feel.
+        /// Per-note bell envelope keeps each note edge-free, and a faint second harmonic adds
+        /// "bright" sparkle. Kept to 0.16s total so it never reads as the longer Win arpeggio.
+        private static float PickupBlip(float t)
+        {
+            float[] notes = { 1319f, 1976f }; // E6-B6
+            const float step = 0.08f;
+            int idx = Mathf.Clamp((int)(t / step), 0, notes.Length - 1);
+            float local = t - idx * step;
+            return (Sine(t, notes[idx]) + Sine(t, notes[idx] * 2f) * 0.2f) * Bell(local, step) * 0.5f;
         }
     }
 }

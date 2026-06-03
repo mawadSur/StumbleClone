@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace StumbleClone.Audio
 {
-    public enum Sfx { UiClick, Jump, Land, Push, Hit, Eliminate, Win, Start }
+    public enum Sfx { UiClick, Jump, Land, Push, Hit, Eliminate, Win, Start, Dash, Pickup }
 
     /// Self-bootstrapping 2D audio singleton. Plays short, procedurally-synthesized SFX
     /// (ProceduralSfx) through a small pooled-source rig, so the game has sound with ZERO audio

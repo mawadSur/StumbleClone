@@ -46,6 +46,7 @@ namespace StumbleClone.Player
             int count = Physics.CapsuleCastNonAlloc(p1, p2, radius, transform.forward,
                 _hits, pushRange, hitMask, QueryTriggerInteraction.Ignore);
 
+            bool landed = false;
             for (int i = 0; i < count; i++)
             {
                 Collider col = _hits[i].collider;
@@ -57,7 +58,11 @@ namespace StumbleClone.Player
                 Vector3 dir = transform.forward;
                 dir.y += upwardForceShare;
                 racer.Knockback(dir.normalized * pushForce);
+                landed = true;
             }
+
+            // Punchy impact freeze — only when the push actually connected with a racer.
+            if (landed) HitStop.Do(0.06f);
         }
 
         private void GetCapsulePoints(out Vector3 p1, out Vector3 p2, out float radius)

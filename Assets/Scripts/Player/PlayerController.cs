@@ -247,7 +247,8 @@ namespace StumbleClone.Player
                 Vector3 v = _rb.linearVelocity;
                 v.y = ActiveJumpSpeed;
                 _rb.linearVelocity = v;
-                AudioManager.Play(Sfx.Jump);
+                // Small pitch jitter so repeated jumps don't sound like a metronome.
+                AudioManager.Play(Sfx.Jump, 1f, UnityEngine.Random.Range(0.95f, 1.08f));
                 // Consume both so a single press can't double-jump within the windows.
                 _jumpBufferedTime = float.NegativeInfinity;
                 _lastGroundedTime = float.NegativeInfinity;
@@ -291,6 +292,15 @@ namespace StumbleClone.Player
                     _dashing = false;
                 }
             }
+            else
+            {
+                // Fall multiplier: while falling and NOT dashing, pile on extra downward gravity so
+                // jumps don't float weightlessly back to earth — the rise stays floaty, the descent
+                // gets punchy and decisive. Gated out during a dash so the dash's gravity-cancel
+                // (above) stays the sole vertical authority for that window.
+                if (_rb.linearVelocity.y < 0f)
+                    _rb.AddForce(Physics.gravity * (GameConstants.FallMultiplier - 1f), ForceMode.Acceleration);
+            }
 
             ApplyMovement();
         }
@@ -314,7 +324,7 @@ namespace StumbleClone.Player
             float yaw = Mathf.Atan2(dir.x, dir.z) * Mathf.Rad2Deg;
             _rb.MoveRotation(Quaternion.Euler(0f, yaw, 0f));
 
-            AudioManager.Play(Sfx.Jump);
+            AudioManager.Play(Sfx.Dash);
             if (_animator != null) _animator.TriggerDash();
         }
 
@@ -454,6 +464,8 @@ namespace StumbleClone.Player
             _inputLockUntil = Time.time + inputLockOnKnockback;
             if (_animator != null) _animator.TriggerKnockedDown();
             AudioManager.Play(Sfx.Hit);
+            // Punchy impact freeze — only reached on a real hit (past spawn grace, shield not consumed).
+            HitStop.Do(0.06f);
         }
 
         // ---- Power-up buff grants (called by Powerup pickups) ----

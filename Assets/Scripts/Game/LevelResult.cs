@@ -15,6 +15,12 @@ namespace StumbleClone.Game
         /// Unified, higher-is-better score used by the leaderboard (per-mode rules below).
         public float score;
 
+        // ---- Token payout (set by GameManager.HandleLevelEnded after the run) ----
+        /// Tokens actually granted to the wallet for this run (post-doubler). 0 for bot-only runs.
+        public int tokensAwarded;
+        /// True when a Token Doubler consumable charge fired on this run (a win), doubling the base.
+        public bool doublerUsed;
+
         // Scoring weights — tweak here (kept named, not magic, per coding standards).
         private const float RaceParTime = 100000f;   // race score = par - time*100 (faster is better)
         private const float RaceTimeWeight = 100f;

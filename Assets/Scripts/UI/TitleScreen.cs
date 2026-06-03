@@ -1,3 +1,5 @@
+using System.Collections;
+using StumbleClone.Audio;
 using StumbleClone.Core;
 using StumbleClone.Game;
 using TMPro;
@@ -134,14 +136,25 @@ namespace StumbleClone.UI
         {
             if (SkinInventory.IsOwned(_previewSkin))
             {
-                SkinStore.Current = _previewSkin; // equip
+                SkinStore.Current = _previewSkin; // equip — quiet acknowledgement
+                AudioManager.Play(Sfx.UiClick);
             }
-            else if (SkinInventory.TryBuy(_previewSkin))
+            else
             {
-                SkinStore.Current = _previewSkin; // bought — equip immediately
-                RefreshTokens();
+                int price = SkinInventory.PriceOf(_previewSkin);
+                if (SkinInventory.TryBuy(_previewSkin))
+                {
+                    SkinStore.Current = _previewSkin; // bought — equip immediately
+                    RefreshTokens();
+                    string name = SkinCatalog.DisplayFor(_previewSkin).ToUpper();
+                    CelebratePurchase(name + " UNLOCKED  -" + price);
+                }
+                else
+                {
+                    // Not affordable: make the failure visible instead of a silent no-op.
+                    FlashLabelDenied(_buyLabel);
+                }
             }
-            // Not owned and not affordable: no-op (the label already shows the price).
             RefreshSkinRow();
         }
 
@@ -251,11 +264,17 @@ namespace StumbleClone.UI
             }
 
             // Locked: try to buy the unlock; on success the button flips to PLAY.
+            int price = LevelProgress.PriceOf(mode);
             if (LevelProgress.TryUnlock(mode))
             {
                 SetModeLabel(lbl, img, mode);
                 RefreshTokens();
                 if (tok != null) tok.text = "TOKENS: " + TokenWallet.Balance;
+                CelebratePurchase(LevelProgress.DisplayName(mode).ToUpper() + " UNLOCKED  -" + price);
+            }
+            else
+            {
+                FlashLabelDenied(lbl); // unaffordable — show the failure
             }
         }
 
@@ -288,7 +307,8 @@ namespace StumbleClone.UI
                 var img = btn.GetComponent<Image>();
                 lbl.fontSize = 26f;
                 rows.Add((id, lbl, img));
-                btn.onClick.AddListener(() => { OnPerkClicked(id); refresh(); });
+                var lblCapture = lbl; // capture for the failure flash
+                btn.onClick.AddListener(() => { OnPerkClicked(id, lblCapture); refresh(); });
                 y -= 84f;
             }
 
@@ -297,7 +317,13 @@ namespace StumbleClone.UI
                 new Vector2(0.5f, 1f), new Vector2(0f, y - 8f), new Vector2(660f, 70f), null);
             doublerLabel = dblBtn.GetComponentInChildren<TMP_Text>();
             doublerLabel.fontSize = 26f;
-            dblBtn.onClick.AddListener(() => { AbilityStore.BuyDoubler(); refresh(); });
+            var dblLabelCapture = doublerLabel; // capture for the failure flash
+            dblBtn.onClick.AddListener(() =>
+            {
+                if (AbilityStore.BuyDoubler()) CelebratePurchase("TOKEN DOUBLER  -" + AbilityStore.DoublerPrice);
+                else FlashLabelDenied(dblLabelCapture);
+                refresh();
+            });
 
             refresh();
 
@@ -320,10 +346,109 @@ namespace StumbleClone.UI
                     : (!owned && !TokenWallet.CanAfford(AbilityStore.PerkPrice(idx)) ? UITheme.Neutral : UITheme.Secondary);
         }
 
-        private void OnPerkClicked(string id)
+        private void OnPerkClicked(string id, TMP_Text label)
         {
-            if (AbilityStore.IsPerkOwned(id)) AbilityStore.EquippedPerk = id;        // equip
-            else if (AbilityStore.BuyPerk(id)) AbilityStore.EquippedPerk = id;       // buy then equip
+            if (AbilityStore.IsPerkOwned(id))
+            {
+                AbilityStore.EquippedPerk = id;        // equip — quiet acknowledgement
+                AudioManager.Play(Sfx.UiClick);
+                return;
+            }
+
+            int price = AbilityStore.PerkPrice(AbilityStore.PerkIndex(id));
+            if (AbilityStore.BuyPerk(id))              // buy then equip
+            {
+                AbilityStore.EquippedPerk = id;
+                int idx = AbilityStore.PerkIndex(id);
+                CelebratePurchase(AbilityStore.PerkNames[idx].ToUpper() + " UNLOCKED  -" + price);
+            }
+            else
+            {
+                FlashLabelDenied(label); // unaffordable — show the failure
+            }
+        }
+
+        // ---- Purchase feedback helpers ------------------------------------------
+
+        // Flash a gold confirmation toast under the TOKENS chip (reusing the daily-bonus toast
+        // pattern from Start), play a click cue, and pulse the chip — the shared celebration for
+        // every successful buy (skin, mode unlock, perk, doubler).
+        //
+        // The toast rides its own top-most overlay (sort 130, above the title=100 and any modal=120)
+        // so it stays visible whether the purchase happened on the title row or inside an open
+        // shop modal. The overlay is destroyed with the toast once it finishes fading.
+        private void CelebratePurchase(string message)
+        {
+            AudioManager.Play(Sfx.UiClick);
+
+            var toastOverlay = RuntimeUI.Overlay("PurchaseToastOverlay", 130);
+            var toast = RuntimeUI.Label(toastOverlay.transform, message, 30,
+                new Vector2(1f, 1f), new Vector2(-40f, -96f), new Vector2(560f, 48f), TextAlignmentOptions.Right);
+            toast.color = UITheme.Gold;
+            toast.fontStyle = FontStyles.Bold;
+            toast.raycastTarget = false; // purely decorative — never swallow taps
+            StartCoroutine(FadeAndDestroy(toast, toastOverlay, 1.6f));
+
+            if (_tokenLabel != null) StartCoroutine(PulseChip(_tokenLabel.rectTransform));
+        }
+
+        // Briefly tint a price label red so an unaffordable tap reads as a denial instead of a
+        // silent no-op. The label's text/colour are restored by the caller's Refresh* on the next
+        // frame's interactions; we explicitly restore here so repeated taps keep working.
+        private void FlashLabelDenied(TMP_Text label)
+        {
+            if (label == null) return;
+            StartCoroutine(FlashRed(label));
+        }
+
+        private static IEnumerator FlashRed(TMP_Text label)
+        {
+            Color original = label.color;
+            label.color = UITheme.Danger;
+            float t = 0f;
+            while (t < 0.35f)
+            {
+                t += Time.unscaledDeltaTime;
+                yield return null;
+            }
+            if (label != null) label.color = original;
+        }
+
+        private IEnumerator PulseChip(RectTransform chip)
+        {
+            if (chip == null) yield break;
+            Vector3 baseScale = Vector3.one;
+            float t = 0f;
+            const float dur = 0.28f;
+            while (t < dur)
+            {
+                t += Time.unscaledDeltaTime;
+                float k = Mathf.Sin(Mathf.Clamp01(t / dur) * Mathf.PI); // 0→1→0 bump
+                chip.localScale = baseScale * (1f + 0.22f * k);
+                yield return null;
+            }
+            if (chip != null) chip.localScale = baseScale;
+        }
+
+        private IEnumerator FadeAndDestroy(TMP_Text toast, GameObject overlay, float hold)
+        {
+            if (toast == null) { if (overlay != null) Destroy(overlay); yield break; }
+            float t = 0f;
+            while (t < hold && toast != null)
+            {
+                t += Time.unscaledDeltaTime;
+                yield return null;
+            }
+            float f = 0f;
+            Color start = toast != null ? toast.color : Color.clear;
+            while (f < 0.4f && toast != null)
+            {
+                f += Time.unscaledDeltaTime;
+                Color c = start; c.a = Mathf.Lerp(start.a, 0f, f / 0.4f);
+                toast.color = c;
+                yield return null;
+            }
+            if (overlay != null) Destroy(overlay); // tears down the toast label with it
         }
     }
 }

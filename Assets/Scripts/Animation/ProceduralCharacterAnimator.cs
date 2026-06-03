@@ -21,6 +21,7 @@ namespace StumbleClone.Animation
         private const float KnockDur = 1.3f;
         private const float DashDur = 0.28f;
         private const float PushDur = 0.25f;
+        private const float LandDur = 0.30f;
 
         private Vector3 _basePos;
         private Quaternion _baseRot;
@@ -33,6 +34,8 @@ namespace StumbleClone.Animation
         private float _knockTimer;
         private float _dashTimer;
         private float _pushTimer;
+        private float _landTimer;
+        private float _landImpact = 1f; // 0..1 strength of the active landing squash
         private bool _victory;
 
         /// Point the animator at the mesh root to animate (usually the Animator's own transform).
@@ -80,6 +83,15 @@ namespace StumbleClone.Animation
         public void NotifyDash() => _dashTimer = DashDur;
 
         public void NotifyPush() => _pushTimer = PushDur;
+
+        /// Touchdown squash on landing — the inverse of the jump's stretch: the body compresses
+        /// down on impact then springs back. <paramref name="impact"/> (0..1) scales how hard the
+        /// squash reads, so a soft step barely dips while a hard fall really crunches.
+        public void NotifyLand(float impact)
+        {
+            _landImpact = Mathf.Clamp01(impact);
+            _landTimer = LandDur;
+        }
 
         /// Looping celebration (hop + twirl) held while true — used by the victory screen.
         public void SetVictory(bool v) => _victory = v;
@@ -130,6 +142,19 @@ namespace StumbleClone.Animation
                 jumpPop = 0.10f * s;
             }
 
+            // ---- Land: touchdown squash — INVERSE of the jump (compress Y, splay XZ, dip) ----
+            float landSquashY = 1f, landSplayXZ = 1f, landDip = 0f;
+            if (_landTimer > 0f)
+            {
+                _landTimer -= dt;
+                float l = 1f - Mathf.Clamp01(_landTimer / LandDur); // 0→1
+                float s = Mathf.Sin(l * Mathf.PI);                  // 0→1→0 (squash in, ease back)
+                float k = s * _landImpact;
+                landSquashY = 1f - 0.20f * k;  // compress vertically on contact
+                landSplayXZ = 1f + 0.12f * k;  // splay out (volume preservation read)
+                landDip = 0.12f * k;           // sink toward the ground briefly
+            }
+
             // ---- Dash: low feet-first SLIDE — drop, recline back, stretch along travel ----
             float dashLean = 0f, dashStretchZ = 1f, dashSquashY = 1f, dashLower = 0f;
             if (_dashTimer > 0f)
@@ -160,12 +185,12 @@ namespace StumbleClone.Animation
             float lean = maxLeanDeg * _speed01 + dashLean + pushLean;
             float sway = Mathf.Sin(_phase) * swayRollDeg * _speed01;
 
-            visual.localPosition = _basePos + Vector3.up * (bob + jumpPop - dashLower + pushPop);
+            visual.localPosition = _basePos + Vector3.up * (bob + jumpPop - dashLower + pushPop - landDip);
             visual.localRotation = _baseRot * Quaternion.Euler(lean, 0f, sway);
             visual.localScale = new Vector3(
-                _baseScale.x * jumpSquashXZ,
-                _baseScale.y * jumpStretchY * dashSquashY * (1f + breath),
-                _baseScale.z * jumpSquashXZ * dashStretchZ);
+                _baseScale.x * jumpSquashXZ * landSplayXZ,
+                _baseScale.y * jumpStretchY * dashSquashY * landSquashY * (1f + breath),
+                _baseScale.z * jumpSquashXZ * dashStretchZ * landSplayXZ);
         }
     }
 }
