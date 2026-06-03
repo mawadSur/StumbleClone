@@ -1,6 +1,8 @@
 using System;
 using StumbleClone.Audio;
+using StumbleClone.CameraRig;
 using StumbleClone.Core;
+using StumbleClone.Visuals;
 using UnityEngine;
 
 namespace StumbleClone.Player
@@ -56,6 +58,7 @@ namespace StumbleClone.Player
         private IPlayerInput _input;
         private PlayerAnimator _animator;
         private Transform _cameraTransform;
+        private ThirdPersonCamera _cameraRig;   // for screen-shake/FOV juice; resolved alongside _cameraTransform
         private float _inputLockUntil;
         private float _turnVelocity;
         private bool _grounded;
@@ -204,17 +207,47 @@ namespace StumbleClone.Player
         private void RefreshCamera()
         {
             Camera cam = Camera.main;
-            if (cam != null) _cameraTransform = cam.transform;
+            if (cam != null)
+            {
+                _cameraTransform = cam.transform;
+                // Resolve the juice rig from the same camera (it lives on the Camera GameObject).
+                if (_cameraRig == null) _cameraRig = cam.GetComponent<ThirdPersonCamera>();
+            }
         }
 
         private void OnEnable()
         {
             RacerRegistry.Register(this);
+            // Landing dust + shake hook. PlayerAnimator owns the airborne->grounded edge detection
+            // and fires OnLanded once per touch-down with a normalized impact; we just react.
+            if (_animator != null) _animator.OnLanded += HandleLanded;
         }
 
         private void OnDisable()
         {
             RacerRegistry.Unregister(this);
+            if (_animator != null) _animator.OnLanded -= HandleLanded;
+        }
+
+        // Landing feedback: a small dust puff at the feet on every touch-down, plus a brief camera
+        // jolt on harder landings. impact is 0 (soft step) .. 1 (hard slam), supplied by PlayerAnimator.
+        // Movement, input-lock, and the fall multiplier are untouched — this is purely additive juice.
+        private void HandleLanded(float impact)
+        {
+            // Feet position: capsule base. ImpactPuff is ReducedMotion-aware internally (smaller/fewer),
+            // so we always spawn the dust; only the camera shake is hard-gated.
+            Vector3 footPosition = transform.position;
+            if (_collider != null)
+                footPosition = transform.TransformPoint(_collider.center) - Vector3.up * (_collider.height * 0.5f);
+            float dustScale = Mathf.Lerp(0.5f, 1f, Mathf.Clamp01(impact));
+            ImpactPuff.Spawn(footPosition, dustScale);
+
+            // Only the harder landings rattle the camera; a soft step shouldn't shake the screen.
+            if (impact > 0.25f)
+            {
+                if (_cameraRig == null) RefreshCamera();
+                if (_cameraRig != null) _cameraRig.AddTrauma(0.25f * Mathf.Clamp01(impact));
+            }
         }
 
         private void Update()
@@ -325,6 +358,9 @@ namespace StumbleClone.Player
             _rb.MoveRotation(Quaternion.Euler(0f, yaw, 0f));
 
             AudioManager.Play(Sfx.Dash);
+            // FOV whoosh on the burst — snaps wider then eases back. No-op under ReducedMotion.
+            if (_cameraRig == null) RefreshCamera();
+            if (_cameraRig != null) _cameraRig.PunchFov(7f);
             if (_animator != null) _animator.TriggerDash();
         }
 
@@ -466,6 +502,16 @@ namespace StumbleClone.Player
             AudioManager.Play(Sfx.Hit);
             // Punchy impact freeze — only reached on a real hit (past spawn grace, shield not consumed).
             HitStop.Do(0.06f);
+            // Camera shake scaled by hit strength: a light shove barely rattles, a hard slam jolts.
+            // Maps force magnitude across a typical push range into ~0.4..0.7 trauma (ReducedMotion-safe
+            // — AddTrauma only produces visible shake when the toggle is off).
+            if (_cameraRig == null) RefreshCamera();
+            if (_cameraRig != null)
+            {
+                float mag = force.magnitude;
+                float trauma = Mathf.Lerp(0.4f, 0.7f, Mathf.Clamp01(mag / Mathf.Max(1f, GameConstants.DefaultPushForce)));
+                _cameraRig.AddTrauma(trauma);
+            }
         }
 
         // ---- Power-up buff grants (called by Powerup pickups) ----

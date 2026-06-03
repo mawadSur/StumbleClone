@@ -12,6 +12,14 @@ namespace StumbleClone.UI
     {
         /// A ScreenSpaceOverlay canvas scaled to 1920x1080, with a GraphicRaycaster. Ensures an
         /// EventSystem exists so buttons/inputs receive events.
+        ///
+        /// Returns a full-rect "SafeArea" child (carrying a <see cref="SafeAreaFitter"/>) rather
+        /// than the canvas itself, so callers that parent their Bg + content onto the returned
+        /// transform get device safe-area insetting (notch / Dynamic Island / hole-punch / nav bar)
+        /// for free. On desktop and most WebGL the safe area equals the full screen, so the fitter
+        /// resolves to anchors (0,0)-(1,1) with zero offsets — a NO-OP that leaves existing layouts
+        /// byte-identical. The returned object still answers GetComponent&lt;GraphicRaycaster&gt;()
+        /// (one is added to the child) and SetActive()/OverlayIntro continue to operate on it.
         public static GameObject Overlay(string name, int sortingOrder)
         {
             EnsureEventSystem();
@@ -22,8 +30,31 @@ namespace StumbleClone.UI
             var scaler = go.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
+            // Balanced match: the 1920x1080 design then scales gracefully on tall phones AND on a
+            // 4:3 iPad landscape instead of clipping to one axis. On 16:9 desktop/WebGL the width
+            // and height scale factors are equal, so this changes nothing there.
+            scaler.matchWidthOrHeight = 0.5f;
             go.AddComponent<GraphicRaycaster>();
-            return go;
+
+            // Full-rect SafeArea child that everything else parents onto. The fitter drives its
+            // anchors to the device safe area each time the screen/orientation/safe-area changes.
+            var safeArea = new GameObject("SafeArea", typeof(RectTransform));
+            var safeRt = (RectTransform)safeArea.transform;
+            safeRt.SetParent(go.transform, false);
+            safeRt.anchorMin = Vector2.zero;
+            safeRt.anchorMax = Vector2.one;
+            safeRt.offsetMin = Vector2.zero;
+            safeRt.offsetMax = Vector2.zero;
+            // A raycaster on the child keeps GetComponent<GraphicRaycaster>() working for callers
+            // that fetch it from the returned object (e.g. HazardTell disables it to stay
+            // non-interactive). The canvas keeps its own raycaster for interactive overlays.
+            safeArea.AddComponent<GraphicRaycaster>();
+            // The canvas was created solely to host this overlay; tying its lifetime to the
+            // returned SafeArea child means callers that Destroy(returned) tear down the whole
+            // overlay (canvas included) exactly as they did when Overlay returned the canvas GO —
+            // no orphaned empty canvas left behind for transient toasts/modals.
+            safeArea.AddComponent<SafeAreaFitter>().OwnParentCanvas();
+            return safeArea;
         }
 
         public static void EnsureEventSystem()

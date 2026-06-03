@@ -32,15 +32,40 @@ namespace StumbleClone.Visuals
         private const float MaxLifetime = 0.6f;
         private const float ReducedMotionScale = 0.6f;  // smaller puff when ReducedMotion is on
 
+        // ---- Confetti tuning (a brighter, livelier celebration variant) ----
+        private const int MinConfetti = 14;
+        private const int MaxConfetti = 20;             // inclusive; still tiny meshes, draw-call cheap
+        private const float ConfettiScale = 0.16f;      // much smaller "bits" than smoke puffs
+        private const float ConfettiScaleJitter = 0.4f; // ± fraction of ConfettiScale per bit
+        private const float ConfettiSpread = 0.5f;      // initial scatter radius around the burst point
+        private const float ConfettiOutward = 2.4f;     // initial horizontal launch speed (m/s)
+        private const float ConfettiPop = 4.0f;         // extra upward pop on launch (m/s)
+        private const float ConfettiGravity = 7.0f;     // downward accel so bits arc up then fall
+        private const float ConfettiMinLifetime = 0.9f;
+        private const float ConfettiMaxLifetime = 1.4f;
+        private const float ConfettiReducedScale = 0.7f;
+
         // Soft greyish-white smoke tones — slight value spread so the cloud reads as volumetric.
         private static readonly Color SmokeLight = new Color(0.92f, 0.92f, 0.94f, 1f);
         private static readonly Color SmokeDark = new Color(0.72f, 0.73f, 0.78f, 1f);
+
+        // Bright party palette for confetti — pulls UITheme-ish hues (pink/purple/gold/green/cyan)
+        // so the shower reads as celebratory against the navy victory backdrop.
+        private static readonly Color[] ConfettiColors =
+        {
+            new Color(0.925f, 0.282f, 0.600f, 1f), // pink   (UITheme.Primary)
+            new Color(0.545f, 0.361f, 0.965f, 1f), // purple (UITheme.Secondary)
+            new Color(1.000f, 0.823f, 0.302f, 1f), // gold   (UITheme.Gold)
+            new Color(0.133f, 0.773f, 0.369f, 1f), // green  (UITheme.Success)
+            new Color(0.150f, 0.850f, 1.000f, 1f), // cyan
+        };
 
         private Vector3 _velocity;
         private Vector3 _startScale;
         private Vector3 _endScale;
         private Material _mat;          // this puff sphere's own material instance (alpha-faded)
         private float _lifetime;
+        private float _gravity;         // 0 for smoke; >0 for confetti so bits arc up then fall
 
         /// Spawn a small smoke cloud at <paramref name="position"/>. Instantiates a few collider-less
         /// sphere primitives, each with its own greyish-white <see cref="RuntimeMaterial"/>, and lets
@@ -53,11 +78,32 @@ namespace StumbleClone.Visuals
         /// <param name="scaleMul">Optional overall size multiplier (default 1).</param>
         public static void Spawn(Vector3 position, float scaleMul = 1f)
         {
+            Spawn(position, null, scaleMul);
+        }
+
+        /// Tinted overload: same drifting/fading smoke cloud, but each sphere is colored toward
+        /// <paramref name="tint"/> (lerped between a darker and lighter shade of it) instead of
+        /// greyish-white. Used for the power-up collect poof so the puff matches the pickup's color.
+        /// Passing a null tint reproduces the default smoke look.
+        /// <param name="position">World point to puff at.</param>
+        /// <param name="tint">Optional color the cloud should read as (null = greyish smoke).</param>
+        /// <param name="scaleMul">Optional overall size multiplier (default 1).</param>
+        public static void Spawn(Vector3 position, Color? tint, float scaleMul = 1f)
+        {
             bool reduced = IsReducedMotion();
             if (reduced) scaleMul *= ReducedMotionScale;
 
             int count = Random.Range(MinPuffs, MaxPuffs + 1);
             if (reduced) count = Mathf.Max(2, count - 2); // fewer puffs in reduced-motion mode
+
+            // Build the light/dark tone pair once: either the smoke greys or shades of the tint.
+            Color toneDark = SmokeDark, toneLight = SmokeLight;
+            if (tint.HasValue)
+            {
+                Color c = tint.Value;
+                toneDark = Color.Lerp(c, Color.black, 0.25f); toneDark.a = 1f;
+                toneLight = Color.Lerp(c, Color.white, 0.35f); toneLight.a = 1f;
+            }
 
             for (int i = 0; i < count; i++)
             {
@@ -77,7 +123,7 @@ namespace StumbleClone.Visuals
                 go.transform.localScale = Vector3.one * Mathf.Max(0.05f, startDiameter);
 
                 // Own material instance per sphere — slight light/dark mix + per-sphere alpha fade.
-                Color tone = Color.Lerp(SmokeDark, SmokeLight, Random.value);
+                Color tone = Color.Lerp(toneDark, toneLight, Random.value);
                 var mat = RuntimeMaterial.Make(tone);
                 MakeTransparent(mat); // so the alpha fade is actually visible in URP/Lit
                 var r = go.GetComponent<Renderer>();
@@ -90,17 +136,74 @@ namespace StumbleClone.Visuals
                               + Vector3.up * (UpwardSpeed * scaleMul * Random.Range(0.7f, 1.2f));
 
                 var puff = go.AddComponent<ImpactPuff>();
-                puff.Init(mat, go.transform.localScale, vel, scaleMul);
+                puff.Init(mat, go.transform.localScale, vel, ExpandFactor, 0f,
+                          Random.Range(MinLifetime, MaxLifetime));
             }
         }
 
-        private void Init(Material mat, Vector3 startScale, Vector3 velocity, float scaleMul)
+        /// Fire a colorful confetti burst at <paramref name="position"/> — a celebratory variant of
+        /// <see cref="Spawn"/>. Launches many smaller, multi-colored bits with a bigger upward pop
+        /// that then arc back down under a faux gravity, all using the same WebGL-safe
+        /// <see cref="RuntimeMaterial"/> + alpha-fade pattern (no ParticleSystem, no runtime shaders).
+        ///
+        /// Honors <see cref="SettingsStore.ReducedMotion"/>: fewer, gentler bits when enabled.
+        /// Keeps within the &lt;500 draw-call budget — even the high end is ~20 tiny meshes that
+        /// destroy themselves within ~1.4s.
+        /// <param name="position">World point to burst from (e.g. above the winner's head).</param>
+        /// <param name="scaleMul">Optional overall size multiplier (default 1).</param>
+        public static void Confetti(Vector3 position, float scaleMul = 1f)
+        {
+            bool reduced = IsReducedMotion();
+            if (reduced) scaleMul *= ConfettiReducedScale;
+
+            int count = Random.Range(MinConfetti, MaxConfetti + 1);
+            if (reduced) count = Mathf.Max(6, count / 2); // fewer bits in reduced-motion mode
+
+            for (int i = 0; i < count; i++)
+            {
+                var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                go.name = "Confetti";
+
+                // Strip the auto-added collider — pure decoration, never physical.
+                var col = go.GetComponent<Collider>();
+                if (col != null) Destroy(col);
+
+                // Tight scatter around the burst point so the bits launch as a cluster.
+                Vector3 offset = Random.insideUnitSphere * (ConfettiSpread * scaleMul);
+                go.transform.position = position + offset;
+
+                float bit = ConfettiScale * scaleMul * (1f + Random.Range(-ConfettiScaleJitter, ConfettiScaleJitter));
+                go.transform.localScale = Vector3.one * Mathf.Max(0.03f, bit);
+
+                // Bright, varied per-bit color — own transparent material instance for the fade.
+                Color tone = ConfettiColors[Random.Range(0, ConfettiColors.Length)];
+                var mat = RuntimeMaterial.Make(tone);
+                MakeTransparent(mat);
+                var r = go.GetComponent<Renderer>();
+                if (r != null) r.sharedMaterial = mat;
+
+                // Fountain launch: fanned outward + a strong upward pop; gravity (below) pulls it back.
+                Vector2 dir = Random.insideUnitCircle.normalized;
+                if (dir == Vector2.zero) dir = Vector2.up;
+                Vector3 vel = new Vector3(dir.x, 0f, dir.y) * (ConfettiOutward * scaleMul * Random.Range(0.5f, 1f))
+                              + Vector3.up * (ConfettiPop * scaleMul * Random.Range(0.7f, 1.2f));
+
+                // Confetti bits don't expand (1× = constant size) and fall under faux gravity.
+                var puff = go.AddComponent<ImpactPuff>();
+                puff.Init(mat, go.transform.localScale, vel, 1f, ConfettiGravity * scaleMul,
+                          Random.Range(ConfettiMinLifetime, ConfettiMaxLifetime));
+            }
+        }
+
+        private void Init(Material mat, Vector3 startScale, Vector3 velocity, float expandFactor,
+                          float gravity, float lifetime)
         {
             _mat = mat;
             _startScale = startScale;
-            _endScale = startScale * ExpandFactor;
+            _endScale = startScale * expandFactor;
             _velocity = velocity;
-            _lifetime = Random.Range(MinLifetime, MaxLifetime);
+            _gravity = gravity;
+            _lifetime = lifetime;
             StartCoroutine(Animate());
         }
 
@@ -116,8 +219,16 @@ namespace StumbleClone.Visuals
                 t += dt;
                 float k = Mathf.Clamp01(t / _lifetime);
 
-                // Ease the drift: velocity damps toward zero so the cloud settles as it fades.
-                _velocity = Vector3.Lerp(_velocity, Vector3.zero, Mathf.Clamp01(Drag * dt));
+                if (_gravity > 0f)
+                {
+                    // Confetti: arc up then fall — apply faux gravity, no settle damping.
+                    _velocity.y -= _gravity * dt;
+                }
+                else
+                {
+                    // Smoke: ease the drift so the cloud settles toward zero as it fades.
+                    _velocity = Vector3.Lerp(_velocity, Vector3.zero, Mathf.Clamp01(Drag * dt));
+                }
                 tr.position += _velocity * dt;
 
                 // Gentle expansion (smoothstep so it puffs fast then eases).

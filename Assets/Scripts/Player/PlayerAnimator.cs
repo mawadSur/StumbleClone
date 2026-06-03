@@ -1,3 +1,4 @@
+using System;
 using StumbleClone.Animation;
 using StumbleClone.Audio;
 using StumbleClone.Core;
@@ -35,6 +36,12 @@ namespace StumbleClone.Player
         private bool _wasGrounded = true;
         private float _prevAirborneFallSpeed; // |vel.y| cached each airborne frame for impact scaling
         private ProceduralCharacterAnimator _proc;
+
+        /// Fired on the airborne -> grounded edge, carrying the normalized landing impact
+        /// (0 = soft touch-down, 1 = hard slam — the same value that drives the squash/SFX). The
+        /// single source of truth for the landing edge: subscribers (e.g. PlayerController, for dust
+        /// + camera shake) get exactly one event per landing, so there's no double-trigger.
+        public event Action<float> OnLanded;
 
         // Dash-lunge overlay for the REAL-animator path: the shipped controller has no "Dash"
         // state, so SetTrigger("Dash") would do nothing. Instead we briefly tilt + stretch the
@@ -201,6 +208,11 @@ namespace StumbleClone.Player
             }
 
             TriggerLand(impact);
+
+            // Notify listeners of the landing edge with the same normalized impact. Fires exactly
+            // once per touch-down (HandleLanding is only called on the justLanded edge), so
+            // dust/shake hooks can't double-trigger.
+            OnLanded?.Invoke(impact);
         }
 
         // Landing squash on the active visual path. Procedural fallback gets NotifyLand; the

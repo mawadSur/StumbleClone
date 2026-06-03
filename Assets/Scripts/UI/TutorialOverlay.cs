@@ -74,8 +74,9 @@ namespace StumbleClone.UI
             controls.richText = true;
 
             // Goal band: above the button, top edge y ≈ -209 — clears the controls above.
+            // Names both live Knockout pressure systems: the hazard waves AND the closing safe zone.
             var goal = RuntimeUI.Label(card.transform,
-                "Goal: Be the <b>LAST one standing</b> — don't fall off, and stay inside the safe zone.",
+                "Goal: Be the <b>LAST one standing</b> — dodge the hazards, don't fall off, and stay inside the <b>shrinking safe zone</b>.",
                 30, new Vector2(0.5f, 0f), new Vector2(0f, 165f), new Vector2(820f, 76f),
                 TextAlignmentOptions.Top);
             goal.color = UITheme.OnSurfaceMuted;

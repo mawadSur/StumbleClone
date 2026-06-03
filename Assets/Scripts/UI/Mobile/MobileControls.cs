@@ -34,6 +34,7 @@ namespace StumbleClone.UI.Mobile
 
         private Canvas _canvas;
         private GameObject _root;
+        private RectTransform _safeArea;
         private bool _built;
         private bool _visibleState;
 
@@ -102,19 +103,34 @@ namespace StumbleClone.UI.Mobile
             scaler.matchWidthOrHeight = 0.5f;
             _root.AddComponent<GraphicRaycaster>();
 
-            BuildJoystick(_root.transform);
+            // Full-rect SafeArea child between the canvas and the controls. On a notched phone or
+            // a phone with a gesture/nav bar this insets the stick + buttons out from under the
+            // cutout and the bottom bar; on desktop/16:9 it resolves to the full rect (no-op), so
+            // the editor preview (ForceShow) is unchanged. All controls parent onto it.
+            var safeAreaGo = new GameObject("SafeArea", typeof(RectTransform));
+            _safeArea = (RectTransform)safeAreaGo.transform;
+            _safeArea.SetParent(_root.transform, false);
+            _safeArea.anchorMin = Vector2.zero;
+            _safeArea.anchorMax = Vector2.one;
+            _safeArea.offsetMin = Vector2.zero;
+            _safeArea.offsetMax = Vector2.zero;
+            safeAreaGo.AddComponent<SafeAreaFitter>();
+
+            BuildJoystick(_safeArea);
             // Right-half drag-to-look pad (camera). Created BEFORE the action buttons so the
             // buttons sit on top and intercept their own taps; drags elsewhere rotate the camera.
-            BuildLookPad(_root.transform);
-            BuildButton(_root.transform, "JumpButton", "JUMP", "<Gamepad>/buttonSouth",
+            BuildLookPad(_safeArea);
+            BuildButton(_safeArea, "JumpButton", "JUMP", "<Gamepad>/buttonSouth",
                 anchor: new Vector2(1f, 0f), anchoredPos: new Vector2(-220f, 200f),
                 size: 230f, color: new Color(0.20f, 0.65f, 0.95f, 0.55f));
-            BuildButton(_root.transform, "PushButton", "PUSH", "<Gamepad>/buttonWest",
+            BuildButton(_safeArea, "PushButton", "PUSH", "<Gamepad>/buttonWest",
                 anchor: new Vector2(1f, 0f), anchoredPos: new Vector2(-470f, 330f),
                 size: 180f, color: new Color(0.95f, 0.55f, 0.20f, 0.55f));
-            BuildButton(_root.transform, "PauseButton", "II", "<Gamepad>/start",
+            // 120px keeps the pause target finger-sized (~48dp at the 1920x1080 reference); the
+            // SafeArea inset keeps it clear of the notch / Dynamic Island in the top-right corner.
+            BuildButton(_safeArea, "PauseButton", "II", "<Gamepad>/start",
                 anchor: new Vector2(1f, 1f), anchoredPos: new Vector2(-90f, -90f),
-                size: 110f, color: new Color(0.1f, 0.1f, 0.1f, 0.45f));
+                size: 120f, color: new Color(0.1f, 0.1f, 0.1f, 0.45f));
         }
 
         // A near-invisible Image covering the right half of the screen. The OnScreenStick lives

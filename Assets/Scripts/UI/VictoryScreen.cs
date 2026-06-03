@@ -5,6 +5,7 @@ using StumbleClone.CameraRig;
 using StumbleClone.Core;
 using StumbleClone.Game;
 using StumbleClone.Player;
+using StumbleClone.Visuals;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -21,7 +22,15 @@ namespace StumbleClone.UI
         private static VictoryScreen _instance;
         private GameObject _overlay;
         private PlayerAnimator _danceAnim;
+        private Transform _winner;       // the dancing winner — confetti rains above their head
         private bool _shown;
+
+        // ---- Confetti shower tuning (celebratory; cheap multi-color bursts) ----
+        private const float ConfettiHeadHeight = 2.6f;   // burst height above the winner's feet
+        private const float ConfettiSpreadX = 1.6f;      // horizontal scatter of burst points
+        private const int ConfettiBursts = 5;            // number of staggered bursts
+        private const float ConfettiBurstGap = 0.35f;    // seconds between bursts
+        private const float ConfettiStartDelay = 0.25f;  // wait for the dance to kick in first
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
@@ -60,6 +69,7 @@ namespace StumbleClone.UI
             _shown = true;
 
             Transform t = winner.Transform;
+            _winner = t;
 
             // Stop the winner moving (disable control + kill momentum) so they dance in place.
             var pc = t.GetComponent<PlayerController>();
@@ -79,6 +89,36 @@ namespace StumbleClone.UI
             Cursor.visible = true;
 
             StartCoroutine(BuildSoon());
+            StartCoroutine(ConfettiShower());
+        }
+
+        /// A short, celebratory confetti shower over the dancing winner: a few staggered, bright
+        /// multi-color bursts above their head. Cheap by construction (ImpactPuff uses collider-less
+        /// fading meshes, not a ParticleSystem) and ReducedMotion-aware — a single gentle burst when
+        /// the setting is on. Uses unscaled time so it still plays if the game is time-paused.
+        private IEnumerator ConfettiShower()
+        {
+            if (_winner == null) yield break;
+
+            bool reduced = SettingsStore.ReducedMotion;
+            int bursts = reduced ? 1 : ConfettiBursts;
+
+            yield return new WaitForSecondsRealtime(ConfettiStartDelay);
+
+            for (int i = 0; i < bursts; i++)
+            {
+                if (_winner == null) yield break; // winner may have been torn down (level reload)
+
+                // Scatter each burst a little around the head so the shower fills the hero shot.
+                Vector3 head = _winner.position + Vector3.up * ConfettiHeadHeight;
+                if (!reduced)
+                    head += new Vector3(Random.Range(-ConfettiSpreadX, ConfettiSpreadX), 0f,
+                                        Random.Range(-ConfettiSpreadX, ConfettiSpreadX));
+
+                ImpactPuff.Confetti(head, 1f);
+
+                if (i < bursts - 1) yield return new WaitForSecondsRealtime(ConfettiBurstGap);
+            }
         }
 
         private IEnumerator BuildSoon()

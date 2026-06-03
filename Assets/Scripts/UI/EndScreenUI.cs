@@ -7,9 +7,16 @@ using StumbleClone.Game;
 
 namespace StumbleClone.UI
 {
-    /// End-of-level screen. Activated by GameEvents.LevelEnded. Reads
-    /// GameManager.Instance.lastResult to render the result text and offers
-    /// Continue (advance to next mode) and Menu (return to main menu) buttons.
+    /// End-of-level screen for a LOSS (a human win defers to VictoryScreen). Activated by
+    /// GameEvents.LevelEnded. Reads GameManager.Instance.lastResult to render a clean, themed
+    /// results card built entirely in code via RuntimeUI: placement ('#N / 8' or 'Eliminated'),
+    /// run time, mode, and the token-payout line. Offers one consistent button row of actions —
+    /// Continue (advance), Menu (return), Leaderboard, Share.
+    ///
+    /// The serialized refs (panel + the old result/stats labels and Continue/Menu buttons) are
+    /// kept for scene compatibility: the panel still hosts the card, the Continue/Menu listeners
+    /// still fire the same handlers, but the old two-label layout is hidden so the card is the
+    /// single source of truth (no more text from two layout systems stacking).
     public class EndScreenUI : MonoBehaviour
     {
         [SerializeField] private GameObject panel;
@@ -19,13 +26,16 @@ namespace StumbleClone.UI
         [SerializeField] private Button menuButton;
 
         private LevelMode lastMode = LevelMode.Race;
-
-        // Runtime-built extras (not scene-wired) so they work without a scene rebuild and
-        // never clash with the serialized Continue/Menu buttons.
-        private TMP_Text newBestBadge;
-        private Button leaderboardButton;
-        private Button shareButton;
         private int lastRank;
+
+        // ---- Code-built results card (parented to the serialized panel) ----------
+        // Built once, lazily, so it works without a scene rebuild and never clashes with the
+        // serialized widgets (which we hide). All labels/buttons live on this card.
+        private bool _cardBuilt;
+        private TMP_Text _newBestBadge;
+        private TMP_Text _placementLabel;
+        private TMP_Text _statsLabel;     // mode + run time
+        private TMP_Text _tokensLabel;    // token payout (+N TOKENS) and doubler note
 
         private void OnEnable()
         {
@@ -35,18 +45,7 @@ namespace StumbleClone.UI
             if (continueButton != null) continueButton.onClick.AddListener(OnContinueClicked);
             if (menuButton != null) menuButton.onClick.AddListener(OnMenuClicked);
 
-            ApplyTheme();
-
             if (panel != null) panel.SetActive(false);
-        }
-
-        private void ApplyTheme()
-        {
-            ThemeBinder.StyleScrim(panel);
-            ThemeBinder.StyleText(resultText, UITheme.Gold);
-            ThemeBinder.StyleText(statsText, UITheme.OnSurfaceMuted);
-            ThemeBinder.StyleButton(continueButton, UITheme.Primary);
-            ThemeBinder.StyleButton(menuButton, UITheme.Neutral);
         }
 
         private void OnDisable()
@@ -75,20 +74,27 @@ namespace StumbleClone.UI
 
             if (panel != null) { panel.SetActive(true); OverlayIntro.Play(panel); }
 
-            EnsureExtras();
+            BuildCard();
 
             int totalRacers = RacerRegistry.All.Count;
             if (totalRacers <= 0) totalRacers = 8;
 
             bool won = false;
             int rank = 0;
+            float duration = 0f;
+            int tokens = 0;
+            bool doublerUsed = false;
             bool newBest = false;
 
             if (GameManager.Instance != null && GameManager.Instance.lastResult != null)
             {
-                won = GameManager.Instance.lastResult.playerWon;
-                rank = GameManager.Instance.lastResult.playerRank;
-                newBest = IsNewBest(lastMode, GameManager.Instance.lastResult.score);
+                var res = GameManager.Instance.lastResult;
+                won = res.playerWon;
+                rank = res.playerRank;
+                duration = res.duration;
+                tokens = res.tokensAwarded;
+                doublerUsed = res.doublerUsed;
+                newBest = IsNewBest(lastMode, res.score);
             }
             else
             {
@@ -97,32 +103,49 @@ namespace StumbleClone.UI
 
             lastRank = rank;
 
-            if (resultText != null)
+            // ---- Placement headline ----
+            if (_placementLabel != null)
             {
-                if (won) resultText.text = "YOU WON!";
-                else if (rank > 0) resultText.text = "You finished #" + rank + " / " + totalRacers;
-                else resultText.text = "Eliminated";
+                if (won) _placementLabel.text = "YOU WON!";
+                else if (rank > 0) _placementLabel.text = "#" + rank + " / " + totalRacers;
+                else _placementLabel.text = "Eliminated";
             }
 
-            if (statsText != null)
+            // ---- Mode + run time ----
+            if (_statsLabel != null)
             {
-                statsText.text = "Mode: " + lastMode;
+                _statsLabel.text = LevelProgress.DisplayName(lastMode) + "   •   " + FormatTime(duration);
+            }
 
-                // Show the token payout for this run on its own gold line under the mode. Reads the
-                // actual granted amount from the run result (rank-scaled consolation, since the win
-                // path is handled by VictoryScreen). Rich-text color overrides the muted base style.
-                if (GameManager.Instance != null && GameManager.Instance.lastResult != null)
+            // ---- Token payout (PRESERVED) ----
+            // Reads the actual granted amount from the run result (rank-scaled consolation; the win
+            // path is handled by VictoryScreen). Keeps the '+N TOKENS' line and the doubler note.
+            if (_tokensLabel != null)
+            {
+                if (tokens > 0)
                 {
-                    int tokens = GameManager.Instance.lastResult.tokensAwarded;
-                    if (tokens > 0)
-                    {
-                        statsText.richText = true;
-                        statsText.text += "\n<color=#FFD24D>+" + tokens + " TOKENS</color>";
-                    }
+                    string note = doublerUsed ? "  <size=70%>(2x DOUBLER)</size>" : "";
+                    _tokensLabel.text = "+" + tokens + " TOKENS" + note;
+                    _tokensLabel.gameObject.SetActive(true);
+                }
+                else
+                {
+                    _tokensLabel.text = "";
+                    _tokensLabel.gameObject.SetActive(false);
                 }
             }
 
-            if (newBestBadge != null) newBestBadge.gameObject.SetActive(newBest);
+            if (_newBestBadge != null) _newBestBadge.gameObject.SetActive(newBest);
+        }
+
+        /// Format a run duration as M:SS (or SS.s under a minute) for the results card.
+        private static string FormatTime(float seconds)
+        {
+            if (seconds <= 0f) return "—";
+            if (seconds < 60f) return seconds.ToString("0.0") + "s";
+            int m = Mathf.FloorToInt(seconds / 60f);
+            int s = Mathf.FloorToInt(seconds % 60f);
+            return m + ":" + s.ToString("00");
         }
 
         /// True if the just-finished run is the player's best stored score for this mode.
@@ -145,25 +168,74 @@ namespace StumbleClone.UI
             return playerBest == float.MinValue || runScore >= playerBest;
         }
 
-        /// Lazily builds the NEW BEST badge plus the View Leaderboard and Share buttons as
-        /// children of the serialized panel. Built once; positioned to avoid the existing
-        /// Continue (y=-40) and Menu (y=-150) buttons. No-op if the panel is missing.
-        private void EnsureExtras()
+        /// Builds the themed results card once, parented to the serialized panel: a NEW BEST badge,
+        /// the placement headline, a mode + run-time line, the token-payout line, and ONE row of
+        /// four actions (Continue / Menu / Leaderboard / Share). The serialized result/stats labels
+        /// and Continue/Menu buttons are hidden so the card is the single visible layout. No-op if
+        /// the panel is missing, or once already built.
+        private void BuildCard()
         {
-            if (panel == null || newBestBadge != null) return;
+            if (panel == null || _cardBuilt) return;
+            _cardBuilt = true;
 
-            // Gold badge above the result text (result sits at y=+200 on a centered panel).
-            newBestBadge = RuntimeUI.Label(panel.transform, "NEW BEST!", 56,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, 330f), new Vector2(700f, 90f));
-            newBestBadge.fontStyle = FontStyles.Bold;
-            newBestBadge.color = UITheme.Gold;
-            newBestBadge.gameObject.SetActive(false);
+            // Hide the legacy scene-wired widgets so we don't render two stacked layouts. Their
+            // Continue/Menu click listeners stay attached (harmless while hidden); the card's own
+            // buttons drive the same handlers.
+            if (resultText != null) resultText.gameObject.SetActive(false);
+            if (statsText != null) statsText.gameObject.SetActive(false);
+            if (continueButton != null) continueButton.gameObject.SetActive(false);
+            if (menuButton != null) menuButton.gameObject.SetActive(false);
 
-            // Secondary actions on a row below the Main Menu button (y=-150), side by side.
-            leaderboardButton = RuntimeUI.Button(panel.transform, "VIEW LEADERBOARD", UITheme.Secondary,
-                new Vector2(0.5f, 0.5f), new Vector2(-200f, -255f), new Vector2(360f, 80f), OnLeaderboardClicked);
-            shareButton = RuntimeUI.Button(panel.transform, "SHARE", UITheme.Secondary,
-                new Vector2(0.5f, 0.5f), new Vector2(200f, -255f), new Vector2(360f, 80f), OnShareClicked);
+            Transform p = panel.transform;
+
+            // NEW BEST badge — top of the card.
+            _newBestBadge = RuntimeUI.Label(p, "NEW BEST!", 52,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 300f), new Vector2(700f, 80f));
+            _newBestBadge.fontStyle = FontStyles.Bold;
+            _newBestBadge.color = UITheme.Gold;
+            _newBestBadge.gameObject.SetActive(false);
+
+            // Placement headline — gold, large, centered.
+            _placementLabel = RuntimeUI.Label(p, "Eliminated", 100,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 170f), new Vector2(900f, 150f));
+            _placementLabel.fontStyle = FontStyles.Bold;
+            _placementLabel.color = UITheme.Gold;
+
+            // Mode + run-time subtitle — muted.
+            _statsLabel = RuntimeUI.Label(p, "", 40,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 70f), new Vector2(900f, 60f));
+            _statsLabel.color = UITheme.OnSurfaceMuted;
+            _statsLabel.richText = true;
+
+            // Token payout line — gold, its own band beneath the stats.
+            _tokensLabel = RuntimeUI.Label(p, "", 46,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), new Vector2(900f, 64f));
+            _tokensLabel.fontStyle = FontStyles.Bold;
+            _tokensLabel.color = UITheme.Gold;
+            _tokensLabel.richText = true;
+            _tokensLabel.gameObject.SetActive(false);
+
+            // ---- One consistent action row (Continue / Menu / Leaderboard / Share) ----
+            // Four equal buttons centered on a single row beneath the card body.
+            const float btnW = 300f;
+            const float btnH = 84f;
+            const float gap = 24f;
+            float step = btnW + gap;
+            float rowY = -200f;
+            float startX = -1.5f * step; // centers four columns around x=0
+
+            RuntimeUI.Button(p, "CONTINUE", UITheme.Primary,
+                new Vector2(0.5f, 0.5f), new Vector2(startX + 0 * step, rowY),
+                new Vector2(btnW, btnH), OnContinueClicked);
+            RuntimeUI.Button(p, "MENU", UITheme.Neutral,
+                new Vector2(0.5f, 0.5f), new Vector2(startX + 1 * step, rowY),
+                new Vector2(btnW, btnH), OnMenuClicked);
+            RuntimeUI.Button(p, "LEADERBOARD", UITheme.Secondary,
+                new Vector2(0.5f, 0.5f), new Vector2(startX + 2 * step, rowY),
+                new Vector2(btnW, btnH), OnLeaderboardClicked);
+            RuntimeUI.Button(p, "SHARE", UITheme.Secondary,
+                new Vector2(0.5f, 0.5f), new Vector2(startX + 3 * step, rowY),
+                new Vector2(btnW, btnH), OnShareClicked);
         }
 
         private void OnLeaderboardClicked()
@@ -186,7 +258,7 @@ namespace StumbleClone.UI
         private static string BuildShareIntent(LevelMode mode, int rank)
         {
             string place = rank > 0 ? "#" + rank : "the finish";
-            string text = $"I placed {place} in the {mode} in StumbleKids! Can you beat me?";
+            string text = $"I placed {place} in the {LevelProgress.DisplayName(mode)} in StumbleKids! Can you beat me?";
             return "https://twitter.com/intent/tweet?text="
                    + UnityWebRequest.EscapeURL(text)
                    + "&url=" + UnityWebRequest.EscapeURL(ShareUrl);

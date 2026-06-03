@@ -282,39 +282,58 @@ namespace StumbleClone.UI
         {
             var modal = BuildModal("ABILITIES", out Transform card);
 
+            // This modal carries more rows than the mode picker (4 perks + a doubler + a
+            // POWER-UPS section of 3 rows + BACK), so grow the shared card taller and a touch
+            // wider. The card is centre-pivoted; content is top-anchored (so the title stays
+            // put) — we extend the bottom edge downward to make room. Widening also keeps the
+            // longer power-up labels from crowding the price tag.
+            var cardRect = card as RectTransform;
+            if (cardRect != null)
+            {
+                cardRect.offsetMin = new Vector2(-400f, -560f); // wider + much taller bottom
+                cardRect.offsetMax = new Vector2(400f, 400f);   // keep the top edge (title) fixed
+            }
+
             var tok = RuntimeUI.Label(card, "TOKENS: " + TokenWallet.Balance, 30,
-                new Vector2(0.5f, 1f), new Vector2(0f, -112f), new Vector2(620f, 40f));
+                new Vector2(0.5f, 1f), new Vector2(0f, -108f), new Vector2(660f, 40f));
             tok.color = UITheme.Gold;
 
             var rows = new System.Collections.Generic.List<(string id, TMP_Text lbl, Image img)>();
             TMP_Text doublerLabel = null;
+            var powerupRows = new System.Collections.Generic.List<(string id, TMP_Text lbl)>();
 
             System.Action refresh = () =>
             {
                 foreach (var r in rows) SetPerkLabel(r.lbl, r.img, r.id);
                 if (doublerLabel != null) doublerLabel.text = DoublerText();
+                foreach (var p in powerupRows) p.lbl.text = PowerupText(p.id);
                 if (tok != null) tok.text = "TOKENS: " + TokenWallet.Balance;
                 RefreshTokens();
             };
 
-            float y = -168f;
+            // Rows are packed tighter (76px pitch, 68px tall) to fit everything; labels stay
+            // at 26pt which reads fine on a phone.
+            const float rowPitch = 76f;
+            const float rowH = 68f;
+            const float rowW = 700f;
+            float y = -158f;
             for (int i = 0; i < AbilityStore.PerkCount; i++)
             {
                 string id = AbilityStore.PerkIds[i]; // capture
                 var btn = RuntimeUI.Button(card, "", UITheme.Secondary,
-                    new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(660f, 70f), null);
+                    new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(rowW, rowH), null);
                 var lbl = btn.GetComponentInChildren<TMP_Text>();
                 var img = btn.GetComponent<Image>();
                 lbl.fontSize = 26f;
                 rows.Add((id, lbl, img));
                 var lblCapture = lbl; // capture for the failure flash
                 btn.onClick.AddListener(() => { OnPerkClicked(id, lblCapture); refresh(); });
-                y -= 84f;
+                y -= rowPitch;
             }
 
             // Consumable: Token Doubler.
             var dblBtn = RuntimeUI.Button(card, "", UITheme.Secondary,
-                new Vector2(0.5f, 1f), new Vector2(0f, y - 8f), new Vector2(660f, 70f), null);
+                new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(rowW, rowH), null);
             doublerLabel = dblBtn.GetComponentInChildren<TMP_Text>();
             doublerLabel.fontSize = 26f;
             var dblLabelCapture = doublerLabel; // capture for the failure flash
@@ -324,15 +343,52 @@ namespace StumbleClone.UI
                 else FlashLabelDenied(dblLabelCapture);
                 refresh();
             });
+            y -= rowPitch;
+
+            // ---- POWER-UPS section: consumable charges spent at the next round start. ----
+            var sectionLabel = RuntimeUI.Label(card, "POWER-UPS  (one charge per round)", 24,
+                new Vector2(0.5f, 1f), new Vector2(0f, y - 4f), new Vector2(rowW, 34f));
+            sectionLabel.fontStyle = FontStyles.Bold;
+            sectionLabel.color = UITheme.Gold;
+            y -= 44f;
+
+            for (int i = 0; i < AbilityStore.PowerupCatalogCount; i++)
+            {
+                string id = AbilityStore.PowerupIds[i]; // capture
+                var btn = RuntimeUI.Button(card, "", UITheme.Secondary,
+                    new Vector2(0.5f, 1f), new Vector2(0f, y), new Vector2(rowW, rowH), null);
+                var lbl = btn.GetComponentInChildren<TMP_Text>();
+                lbl.fontSize = 26f;
+                powerupRows.Add((id, lbl));
+                var lblCapture = lbl; // capture for the failure flash
+                btn.onClick.AddListener(() =>
+                {
+                    if (AbilityStore.BuyPowerup(id))
+                        CelebratePurchase(AbilityStore.PowerupNames[AbilityStore.PowerupIndex(id)].ToUpper()
+                            + "  -" + AbilityStore.PowerupPrice(id));
+                    else
+                        FlashLabelDenied(lblCapture);
+                    refresh();
+                });
+                y -= rowPitch;
+            }
 
             refresh();
 
             RuntimeUI.Button(card, "BACK", UITheme.Neutral,
-                new Vector2(0.5f, 0f), new Vector2(0f, 42f), new Vector2(300f, 64f), () => Destroy(modal));
+                new Vector2(0.5f, 0f), new Vector2(0f, 38f), new Vector2(300f, 60f), () => Destroy(modal));
         }
 
         private static string DoublerText()
             => "TOKEN DOUBLER  x" + AbilityStore.DoublerCount + "   [BUY " + AbilityStore.DoublerPrice + "]";
+
+        // "<Name>  x<count>   [BUY <price>]" — matches the doubler row's compact format.
+        private static string PowerupText(string id)
+        {
+            int idx = AbilityStore.PowerupIndex(id);
+            string name = idx >= 0 ? AbilityStore.PowerupNames[idx] : id;
+            return name + "  x" + AbilityStore.PowerupCount(id) + "   [BUY " + AbilityStore.PowerupPrice(id) + "]";
+        }
 
         private void SetPerkLabel(TMP_Text lbl, Image img, string id)
         {

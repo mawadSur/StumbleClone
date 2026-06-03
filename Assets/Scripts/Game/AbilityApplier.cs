@@ -35,6 +35,15 @@ namespace StumbleClone.Game
                 case PerkEffect.None:
                 default: break;
             }
+
+            // Consumable power-ups: for each charge owned, spend one and stack its effect on
+            // top of (and after) the equipped perk. These are short bursts for the round start.
+            if (AbilityStore.PowerupCount("rocket") > 0 && AbilityStore.ConsumePowerup("rocket"))
+                player.ApplySpeedBoost(1.4f, 10f);
+            if (AbilityStore.PowerupCount("bubble") > 0 && AbilityStore.ConsumePowerup("bubble"))
+                player.GrantShield();
+            if (AbilityStore.PowerupCount("megahop") > 0 && AbilityStore.ConsumePowerup("megahop"))
+                player.GrantJumpBoost(1.5f, 10f);
         }
     }
 }

@@ -2,6 +2,7 @@ using System.Collections;
 using StumbleClone.Audio;
 using StumbleClone.Bots;
 using StumbleClone.Player;
+using StumbleClone.Visuals;
 using UnityEngine;
 
 namespace StumbleClone.Obstacles
@@ -295,6 +296,11 @@ namespace StumbleClone.Obstacles
         {
             _collected = true;
             AudioManager.Play(Sfx.Pickup); // little pickup pop — distinct from the match-win chime
+
+            // Collect poof: a small smoke burst tinted toward this pickup's color, on top of the
+            // scale-up + fade below. WebGL-safe + ReducedMotion-aware (handled inside ImpactPuff).
+            ImpactPuff.Spawn(transform.position, _baseColor, 0.8f);
+
             var col = GetComponent<SphereCollider>();
             if (col != null) col.enabled = false;
             StartCoroutine(PopThenDestroy());

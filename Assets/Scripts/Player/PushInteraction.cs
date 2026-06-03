@@ -1,5 +1,7 @@
 using StumbleClone.Audio;
+using StumbleClone.CameraRig;
 using StumbleClone.Core;
+using StumbleClone.Visuals;
 using UnityEngine;
 
 namespace StumbleClone.Player
@@ -20,6 +22,7 @@ namespace StumbleClone.Player
         private float _nextPushTime;
 
         private PlayerAnimator _animator;
+        private ThirdPersonCamera _cameraRig;   // resolved lazily for the on-hit camera jolt
 
         private void Awake()
         {
@@ -47,6 +50,7 @@ namespace StumbleClone.Player
                 _hits, pushRange, hitMask, QueryTriggerInteraction.Ignore);
 
             bool landed = false;
+            Vector3 contactPoint = Vector3.zero;
             for (int i = 0; i < count; i++)
             {
                 Collider col = _hits[i].collider;
@@ -58,11 +62,33 @@ namespace StumbleClone.Player
                 Vector3 dir = transform.forward;
                 dir.y += upwardForceShare;
                 racer.Knockback(dir.normalized * pushForce);
+
+                // Capture the contact point of the first racer the push connects with, for the scuff.
+                // A zero-distance CapsuleCast returns a (0,0,0) hit point; fall back to the target's
+                // position in that case so the puff lands on the body, not at the world origin.
+                if (!landed)
+                {
+                    Vector3 p = _hits[i].point;
+                    contactPoint = p == Vector3.zero ? racer.Transform.position : p;
+                }
                 landed = true;
             }
 
             // Punchy impact freeze — only when the push actually connected with a racer.
-            if (landed) HitStop.Do(0.06f);
+            if (landed)
+            {
+                HitStop.Do(0.06f);
+                // Scuff of dust at the contact point (ReducedMotion-aware inside ImpactPuff).
+                ImpactPuff.Spawn(contactPoint, 0.7f);
+                // Small camera jolt on the connecting shove. Hard-gated by ReducedMotion inside AddTrauma's
+                // consumer (the shake only renders when the toggle is off).
+                if (_cameraRig == null)
+                {
+                    Camera cam = Camera.main;
+                    if (cam != null) _cameraRig = cam.GetComponent<ThirdPersonCamera>();
+                }
+                if (_cameraRig != null) _cameraRig.AddTrauma(0.35f);
+            }
         }
 
         private void GetCapsulePoints(out Vector3 p1, out Vector3 p2, out float radius)

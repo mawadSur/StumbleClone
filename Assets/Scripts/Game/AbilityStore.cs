@@ -26,6 +26,16 @@ namespace StumbleClone.Game
         private const string DoublerKey = "stumbleclone.consumable.doubler";
         public const int DoublerPrice = 50;
 
+        // ---- Consumable power-ups -----------------------------------------------
+        // Buy charges that are auto-applied at the start of the next round (one charge
+        // spent per round), STACKING on top of the equipped perk. Mirrors the Token
+        // Doubler pattern: per-id charge counts in PlayerPrefs, paid via TokenWallet.
+        public static readonly string[] PowerupIds   = { "rocket", "bubble", "megahop" };
+        public static readonly string[] PowerupNames = { "Rocket Start", "Bubble Shield", "Mega Hops" };
+        private static readonly int[]    PowerupPrices = { 40, 60, 40 };
+
+        private const string PowerupPrefix = "stumbleclone.powerup.";
+
         public static event Action Changed;
 
         public static int PerkCount => PerkIds.Length;
@@ -83,6 +93,47 @@ namespace StumbleClone.Game
             int n = DoublerCount;
             if (n <= 0) return false;
             PlayerPrefs.SetInt(DoublerKey, n - 1);
+            PlayerPrefs.Save();
+            Changed?.Invoke();
+            return true;
+        }
+
+        // ---- Consumable power-up API --------------------------------------------
+        public static int PowerupCatalogCount => PowerupIds.Length;
+
+        public static int PowerupIndex(string id)
+        {
+            for (int i = 0; i < PowerupIds.Length; i++) if (PowerupIds[i] == id) return i;
+            return -1;
+        }
+
+        public static int PowerupPrice(int i) => (i >= 0 && i < PowerupPrices.Length) ? PowerupPrices[i] : 0;
+        public static int PowerupPrice(string id) => PowerupPrice(PowerupIndex(id));
+
+        /// Charges currently owned for a given power-up id (never negative).
+        public static int PowerupCount(string id)
+        {
+            if (PowerupIndex(id) < 0) return 0;
+            return Mathf.Max(0, PlayerPrefs.GetInt(PowerupPrefix + id, 0));
+        }
+
+        /// Buy one charge if affordable; spends tokens then increments the charge count.
+        public static bool BuyPowerup(string id)
+        {
+            if (PowerupIndex(id) < 0) return false;
+            if (!TokenWallet.TrySpend(PowerupPrice(id))) return false;
+            PlayerPrefs.SetInt(PowerupPrefix + id, PowerupCount(id) + 1);
+            PlayerPrefs.Save();
+            Changed?.Invoke();
+            return true;
+        }
+
+        /// Spend one charge if any remain (called at the start of a round to apply the effect).
+        public static bool ConsumePowerup(string id)
+        {
+            int n = PowerupCount(id);
+            if (n <= 0) return false;
+            PlayerPrefs.SetInt(PowerupPrefix + id, n - 1);
             PlayerPrefs.Save();
             Changed?.Invoke();
             return true;
