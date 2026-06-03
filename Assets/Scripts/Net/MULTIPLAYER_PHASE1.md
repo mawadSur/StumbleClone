@@ -1,117 +1,111 @@
-# Multiplayer — Phase 1 (Editor Wiring Checklist)
+# Multiplayer — Phase 1 (Final Setup)
 
-The Phase-1 **code** groundwork is in place and compiles against Netcode for GameObjects
-(`com.unity.netcode.gameobjects` 2.2.0, `com.unity.transport` 2.7.2). It is **dormant**: nothing
-spawns a `NetworkManager`, so single-player is completely unaffected. To make networked play actually
-run, a human must do the editor steps below — they cannot be done headlessly.
+Phase-1 makes networked players actually **spawn + be controllable** over Unity Relay, using
+Netcode for GameObjects (`com.unity.netcode.gameobjects` 2.2.0) + the Unity Multiplayer Services
+SDK (`com.unity.services.multiplayer` 2.2.3). The editor wiring is now **automated** — one menu call
+(or one headless `-executeMethod`) does it all. What remains is **account-level** work that only a human
+can do in the Unity Cloud dashboard, plus the 2-client test.
 
-## What already exists (code)
+## Code in place
 
 | File | Role |
 |------|------|
-| `NetworkBootstrap.cs` | Host/client entry points + `ConfigureTransport(address, port, useWebSockets)` helper. |
-| `NetworkInputProvider.cs` | `NetworkBehaviour` implementing `IPlayerInput`. Owner streams local input to the server; non-owners read replicated values through the `IPlayerInput` surface. |
-| `NetworkPlayerLink.cs` | `NetworkBehaviour` on the player. On spawn, for non-owners it calls `PlayerController.SetInputSource(networkInputProvider)` so remote players are driven by replicated input; the owner keeps local input. |
+| `Editor/MultiplayerSetup.cs` | One-call, idempotent wiring. Adds `NetworkObject` + `NetworkTransform` + `NetworkInputProvider` + `NetworkPlayerLink` to `Player.prefab`, and builds `Assets/Resources/Net/NetworkManager.prefab` (`NetworkManager` + `UnityTransport`, `NetworkConfig.PlayerPrefab` = Player). Menu **StumbleClone > Multiplayer > Setup** and headless `StumbleClone.EditorTools.MultiplayerSetup.Run`. |
+| `NetworkGame.cs` | Runtime glue. `EnsureManager()` instantiates the Resources NetworkManager before a session; on the server, positions each connected client's auto-spawned Player at a `"Respawn"` spawn point. No-op offline. |
+| `NetworkPlayerLink.cs` | On spawn, non-owners get `PlayerController.SetInputSource(NetworkInputProvider)` (driven by replicated input); the owner keeps local input. |
+| `NetworkInputProvider.cs` | `NetworkBehaviour : IPlayerInput`. Owner streams local input to the server; non-owners read replicated values. |
+| `NetworkBootstrap.cs` | Lower-level `StartHost/StartClient/ConfigureTransport` helpers (direct/LAN fallback). |
 
-The input seam (`IPlayerInput`, `PlayerController.SetInputSource`, `PlayerInputHandler`) is unchanged —
-the movement code does not know or care whether input is local or networked.
+NGO + `NetworkConfig.PlayerPrefab` auto-spawn one owned Player per connected client. The Multiplayer
+Services SDK's NGO network handler drives `NetworkManager.Singleton` directly, so creating/joining a
+session over Relay auto-starts the NGO host/client — no manual `StartHost/StartClient` needed when using
+sessions.
 
-## Editor steps (do these, in order)
+## Setup steps (in order)
 
-### 1. Make `Player.prefab` a NetworkObject
-- Open `Player.prefab`.
-- **Add Component → Network Object** (`NetworkObject`). This is required on every spawnable networked object.
-- **Add Component → Network Input Provider** (`NetworkInputProvider`). On the owner it auto-resolves the
-  local `PlayerInputHandler`; you may also drag the handler into its `localInput` field explicitly.
-- **Add Component → Network Player Link** (`NetworkPlayerLink`). It auto-resolves `PlayerController` and
-  `NetworkInputProvider` on the same object; optionally drag them into the fields to skip the lookup.
-- Save the prefab.
-- (Phase 2) For server-authoritative movement you'll also add a `NetworkTransform` / `NetworkRigidbody`,
-  but Phase 1 only needs input replication, so skip those for now.
+### (a) Link a Unity Cloud project
+- **Edit > Project Settings > Services** (or **Window > General > Services**). Sign in.
+- Create/select an **Organization** and **Project**, then **Link** it. This writes the project ID into
+  `ProjectSettings/`. (Alternatively create the project at https://cloud.unity.com and link by ID.)
+- Without a linked cloud project, Relay/Lobby/Authentication calls fail at runtime.
 
-### 2. Create the NetworkManager + transport
-- In the gameplay scene (or a dedicated bootstrap scene loaded first), create an empty GameObject named
-  `NetworkManager`.
-- **Add Component → Network Manager** (`Unity.Netcode.NetworkManager`).
-- **Add Component → Unity Transport** (`Unity.Netcode.Transports.UTP.UnityTransport`). The NetworkManager
-  auto-detects it as the active `NetworkTransport`.
-- Leave the NetworkManager's "Start" behavior OFF — sessions start only when game code calls
-  `NetworkBootstrap.StartHost()` / `StartClient()`, keeping everything dormant until then.
+### (b) Enable services in the Unity Cloud dashboard
+On the linked project at https://cloud.unity.com, enable:
+- **Relay** — the transport for internet play (NAT/firewall traversal; what sessions use here).
+- **Lobby** — backs session discovery / join-by-code.
+- **Authentication** — turn on the **Anonymous** sign-in provider (every player must be signed in before
+  creating/joining a session).
 
-### 3. Register Player.prefab as the PlayerPrefab
-- On the NetworkManager, under **NetworkConfig**, set **Player Prefab** = `Player.prefab`.
-- NGO will then auto-spawn one Player per connected client and assign ownership to that client. That
-  ownership is exactly what `NetworkPlayerLink` / `NetworkInputProvider` key off (`IsOwner`).
-- Make sure `Player.prefab` is also in the **Network Prefabs** list if you reference it as a prefab
-  elsewhere (the PlayerPrefab slot registers it automatically; additional spawns need the list).
+> Free tiers cover small-scale testing. The Multiplayer Services package already pulls in the Relay, Lobby,
+> Authentication and Core dependencies — no extra package installs are required.
 
-### 4. Transport protocol: WebSocket (WebGL) vs UDP (native)
-- WebGL **cannot** open raw UDP sockets — a WebGL build **must** use WebSockets.
-- Native desktop / iOS / Android use plain UDP for lower latency.
-- Set this from code before connecting:
-  ```csharp
-  // WebGL build:
-  NetworkBootstrap.ConfigureTransport("127.0.0.1", NetworkBootstrap.DefaultPort, useWebSockets: true);
-  // Native build:
-  NetworkBootstrap.ConfigureTransport("127.0.0.1", NetworkBootstrap.DefaultPort, useWebSockets: false);
+### (c) Run the editor wiring once
+- In the editor: **StumbleClone > Multiplayer > Setup**. Watch the Console for `[MultiplayerSetup]` logs.
+- It is **idempotent** — safe to run again any time; it only adds what's missing.
+- Headless / CI (also safe to chain into a build step):
+  ```bash
+  Unity -batchmode -quit -projectPath . \
+    -executeMethod StumbleClone.EditorTools.MultiplayerSetup.Run
   ```
-- Host and client must agree on the protocol. `UseWebSockets` must be set **before** the socket binds;
-  `ConfigureTransport` does this, so call it before `StartHost` / `StartClient`.
-- For a hosted WebSocket server you'll later need TLS/`wss://` + a cert (out of Phase-1 scope; localhost
-  testing works over plain `ws://`).
+- After it runs: `Player.prefab` is a NetworkObject and `Assets/Resources/Net/NetworkManager.prefab`
+  exists. `NetworkGame.EnsureManager()` loads that prefab at runtime, so nothing needs to be placed in
+  any scene.
 
-### 5. Run a 2-client local test
-Two instances on one machine, talking over `127.0.0.1`:
+### (d) Drive a session from game code
+Sign in, ensure the manager, then create/join. Minimal flow (matches the cached SDK signatures):
+```csharp
+using Unity.Services.Core;
+using Unity.Services.Authentication;
+using Unity.Services.Multiplayer;
+using StumbleClone.Net;
 
-**Option A — ParrelSync / Multiplayer Play Mode (fastest loop)**
-- Use Unity's **Multiplayer Play Mode** (Window → Multiplayer Play Mode) or the ParrelSync clone tool to
-  open a second virtual player from the same project.
-- Player 1: call `ConfigureTransport("127.0.0.1", 7777, useWebSockets:false)` then `StartHost()`.
-- Player 2 (clone): same `ConfigureTransport`, then `StartClient()`.
+// Once at startup:
+await UnityServices.InitializeAsync();
+if (!AuthenticationService.Instance.IsSignedIn)
+    await AuthenticationService.Instance.SignInAnonymouslyAsync();
 
-**Option B — Two builds (closest to shipping)**
-- Make a desktop build (UDP) — or a WebGL build served locally with WebSockets enabled.
-- Launch instance A → host; launch instance B → client; both point at `127.0.0.1:7777`.
+NetworkGame.EnsureManager();   // must exist before a session (SDK drives NetworkManager.Singleton)
+
+// HOST — create a Relay-backed session and show the join code:
+var hostSession = await MultiplayerService.Instance.CreateSessionAsync(
+    new SessionOptions { MaxPlayers = 8 }.WithRelayNetwork());
+Debug.Log($"Join code: {hostSession.Code}");   // give this to the other player
+
+// CLIENT — join by that code:
+var session = await MultiplayerService.Instance.JoinSessionByCodeAsync(joinCode);
+```
+`CreateSessionAsync` returns an `IHostSession` (has `.Code`, `.Id`, `.MaxPlayers`, `.PlayerCount`,
+`.Players`); `JoinSessionByCodeAsync` returns an `ISession`. `.WithRelayNetwork()` is the extension that
+makes the SDK allocate Relay and auto-start NGO host/client. Leave with `session.LeaveAsync()`.
+
+### (e) Test with 2 clients
+You need **two running instances** signed in to the **same linked cloud project**:
+- **Fastest loop:** Unity **Multiplayer Play Mode** (Window > Multiplayer Play Mode) — enable a second
+  virtual player; both run from this project. One hosts, the other joins with the printed code.
+- **Closest to shipping:** two builds (two browser tabs for WebGL, or two desktop instances). One hosts
+  and prints the join **Code**; type that code into the other to join.
 
 **What you should see**
-- Two Player objects spawn. Each instance owns one (`IsOwner == true`) and drives it with local input.
-- The other (remote) Player on each instance is driven by replicated input via `NetworkPlayerLink` →
-  `SetInputSource(networkInput)`. Move on host → remote sees it move; jump/push edges replicate.
-- A small input latency (~1 tick) on remote players, and possible coalescing of rapid presses, are the
-  expected Phase-1 approximations (see edge-handling notes in `NetworkInputProvider.cs`).
+- Two Player objects spawn, each at a different `"Respawn"` spawn point (server-positioned via
+  `NetworkGame` → `NetworkTransform.Teleport`).
+- Each instance owns one Player (`IsOwner == true`) and drives it with local input; the remote Player is
+  driven by replicated input (`NetworkPlayerLink` → `SetInputSource`) and its position replicates via
+  `NetworkTransform`. Move/jump/push on one side → the other side sees it.
 
-> A LAN test across two machines is the same, but use the host's LAN IP instead of `127.0.0.1` and open
-> the port in the firewall. Internet play needs Relay/NAT punch-through — Phase 2.
+## Notes & Phase-1 limitations (by design)
 
-## Known Phase-1 limitations (by design)
-
-- **Input only is replicated**, not transforms. Both sides simulate the Rigidbody locally from the same
-  input, so positions will drift without a `NetworkTransform`/`NetworkRigidbody` + reconciliation.
-- **Edge-press approximation.** `JumpPressed`/`PushPressed`/`PausePressed` are modeled as replicated
-  counters consumed once; rapid presses in one replication window can coalesce, and a press that arrives
-  while `InputLocked` is held is deferred (fires when the lock lifts) rather than dropped.
-- **No bots, no win logic, no lobby** over the network yet (see Phase 2).
-- **`Pause` over the network is questionable** — pausing is normally a local-only concern; it's
-  replicated here for completeness but a networked game likely shouldn't let one client pause the
-  session. Decide policy in Phase 2.
-
-## What Phase 2 needs
-
-- **Server-puppeted bots.** `NavMeshAgent` has no networking API. Run AI/NavMesh on the server only and
-  replicate the resulting transforms (e.g. a server-write `NetworkTransform`); clients render bots as
-  pure visuals. `BotController` currently drives a kinematic Rigidbody from the agent — that stays
-  server-side.
-- **Client-side prediction + reconciliation** for the player Rigidbody so owners feel zero input latency
-  while the server stays authoritative (store input + state per tick, replay on correction).
-- **Replicated `RacerRegistry` / win logic.** Racer registration, finish/elimination, ranks, survival
-  timer, and shrink radius (the `GameEvents` bus) must become server-authoritative and replicate to
-  clients (NetworkVariables or RPC fan-out) instead of each client computing locally.
-- **`NetworkTransform`/`NetworkRigidbody`** on `Player.prefab` and bot prefabs.
-- **Lobby / matchmaking + Relay** for 8-player internet play (Unity Relay/Lobby or a custom dedicated
-  server), with `wss://` + TLS for WebGL.
-- **Ownership & spawn flow** for power-ups, hazards, and arena tilt so their effects are consistent
-  across clients.
+- **WebGL** uses Relay over secure WebSockets automatically through the SDK — no manual transport protocol
+  toggling is needed for session-based play (the old `ConfigureTransport(useWebSockets:…)` path is only for
+  the direct/LAN fallback in `NetworkBootstrap`).
+- **Input + transform replicate**, but there is **no client-side prediction** yet — remote players show ~1
+  network tick of latency and rapid presses can coalesce (see `NetworkInputProvider` edge-handling notes).
+- **No networked bots, win logic, or lobby UI** yet. NavMesh bots stay server-side; replicating them,
+  server-authoritative `RacerRegistry`/win logic, prediction/reconciliation, and 8-player matchmaking/lobby
+  UI are Phase 2.
+- The `NetworkManager` prefab lives under `Resources/Net/` so it loads in headless/CI builds with no scene
+  edits; `NetworkGame.EnsureManager()` makes it a `DontDestroyOnLoad` singleton.
 
 ---
-*This file documents human-only editor steps; the corresponding code (`NetworkBootstrap`,
-`NetworkInputProvider`, `NetworkPlayerLink`) compiles and is dormant until the above wiring exists.*
+*Editor wiring is automated and idempotent (`MultiplayerSetup`); the cloud-link + service-enable steps
+(a)/(b) are the only human-only prerequisites. All networking code compiles against the cached SDK and is
+dormant until a session is created/joined.*

@@ -32,8 +32,10 @@ namespace StumbleClone.Net
             if (playerController == null) playerController = GetComponent<PlayerController>();
             if (networkInput == null) networkInput = GetComponent<NetworkInputProvider>();
 
-            // Owner keeps its local input (PlayerController's Awake already resolved the local
-            // PlayerInputHandler). Nothing to do.
+            // Owner keeps its local input: PlayerController's Awake already resolved the local
+            // PlayerInputHandler, and the co-located NetworkInputProvider (which streams that same input up
+            // to the server) runs itself off IsOwner — so the owner needs no SetInputSource call. Bail early.
+            // NetworkGame handles server-side spawn placement; this component only routes input.
             if (IsOwner) return;
 
             // Remote instance: drive it from replicated input. Guard both refs — a partially-wired

@@ -106,10 +106,13 @@ namespace StumbleClone.UI
                 new Vector2(0.5f, 0.39f), Vector2.zero, new Vector2(460f, 64f), OnCycleDifficulty);
             _difficultyLabel = diffBtn.GetComponentInChildren<TMP_Text>();
 
-            // PLAY opens the mode picker (Knockout free; Race/Survival are token-unlocks).
-            // Single primary CTA (pink). Below it: PERKS shop + LEADERBOARD share a row.
+            // Two prominent CTAs share the PLAY band (y=0.27): PLAY (pink, solo career) on the left,
+            // MULTIPLAYER (gold, host/join by code) on the right. Keeping them on the same row leaves
+            // the BOTS (0.39) and PERKS/LEADERBOARD (0.13) bands untouched. Below: PERKS + LEADERBOARD.
             RuntimeUI.Button(bg.transform, "PLAY", UITheme.Primary,
-                new Vector2(0.5f, 0.27f), Vector2.zero, new Vector2(440f, 92f), OnPlay);
+                new Vector2(0.5f, 0.27f), new Vector2(-235f, 0f), new Vector2(420f, 92f), OnPlay);
+            RuntimeUI.Button(bg.transform, "MULTIPLAYER", UITheme.Accent,
+                new Vector2(0.5f, 0.27f), new Vector2(235f, 0f), new Vector2(420f, 92f), OnMultiplayer);
             RuntimeUI.Button(bg.transform, "PERKS", UITheme.Secondary,
                 new Vector2(0.5f, 0.13f), new Vector2(-125f, 0f), new Vector2(290f, 66f), OpenPerksPanel);
             RuntimeUI.Button(bg.transform, "LEADERBOARD", UITheme.Secondary,
@@ -191,6 +194,14 @@ namespace StumbleClone.UI
         {
             if (_nameInput != null) LeaderboardStore.SetPlayerName(_nameInput.text);
             OpenModePanel();
+        }
+
+        // Open the host/join-by-code lobby. Commit the entered name first so the lobby roster and
+        // every networked session use the up-to-date name (same contract as OnPlay).
+        private void OnMultiplayer()
+        {
+            if (_nameInput != null) LeaderboardStore.SetPlayerName(_nameInput.text);
+            MultiplayerUI.Open();
         }
 
         private void OnLeaderboard()
