@@ -48,6 +48,11 @@ namespace StumbleClone.Obstacles
         // shrinking walkable surface without per-frame cost.
         private const float NavRebuildInterval = 1.5f;
 
+        // How far ahead (seconds) the danger band warns: its inner edge is drawn where the
+        // floor WILL be this many seconds from now, so the red band covers the strip of floor
+        // about to vanish and players get a heads-up to move inward before the lip reaches them.
+        private const float WarnLookahead = 2.5f;
+
         private const string ArenaObjectName = "Arena";
         // A unit Cylinder primitive's mesh spans diameter 1 (radius 0.5) on X/Z; used as a
         // fallback if the MeshFilter's real extents are somehow unavailable.
@@ -239,12 +244,47 @@ namespace StumbleClone.Obstacles
 
             ThrottledNavRebuild(targetRadius);
 
-            // Repurposed ring: a thin bright rim highlight drawn AT the live platform edge.
+            // Repurposed ring: a thin bright rim highlight drawn AT the live platform edge,
+            // plus a translucent red danger band covering the floor about to vanish. The band's
+            // inner edge is the WARN-LOOKAHEAD radius (where the floor will be in ~2.5s), mapped
+            // onto the live measured radius so it tracks exactly even if other systems nudge scale.
             if (_ring != null)
             {
                 _ring.Configure(_center, _fullRadius); // keep centre tracking the platform
-                _ring.UpdateVisual(_currentRadius, _fullRadius);
+                float warnInner = ComputeWarnInnerRadius(targetRadius);
+                _ring.UpdateVisual(_currentRadius, warnInner, _fullRadius);
             }
+        }
+
+        /// Radius the danger band's INNER edge should sit at: the floor's projected position
+        /// WarnLookahead seconds from now. Computed from the same shrink curve and rescaled to
+        /// the live measured radius (currentRadius / targetRadius) so the band hugs the real lip
+        /// regardless of mesh/scale quirks. Clamped to the minimum so it never undershoots the
+        /// resting floor, and never exceeds the current edge (the band has zero width once settled).
+        private float ComputeWarnInnerRadius(float targetRadius)
+        {
+            float minRadius = _fullRadius * MinRadiusFraction;
+            float elapsed = Time.time - _roundStartTime;
+
+            // Target radius WarnLookahead seconds into the future, on the same SmoothStep curve.
+            float futureElapsed = elapsed + WarnLookahead;
+            float futureTarget;
+            if (futureElapsed <= GracePeriod)
+            {
+                futureTarget = _fullRadius;
+            }
+            else
+            {
+                float t = Mathf.Clamp01((futureElapsed - GracePeriod) / ShrinkDuration);
+                futureTarget = Mathf.Lerp(_fullRadius, minRadius, Mathf.SmoothStep(0f, 1f, t));
+            }
+
+            // Rescale the projected (target-space) radius onto the live measured radius so the band
+            // stays glued to the real edge. targetRadius is never ~0 here (>= minRadius > 0).
+            float scale = targetRadius > 0.0001f ? (_currentRadius / targetRadius) : 1f;
+            float inner = futureTarget * scale;
+
+            return Mathf.Clamp(inner, minRadius, _currentRadius);
         }
 
         /// Hold full for the grace window, then ease down to the minimum over the shrink
