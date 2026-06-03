@@ -179,6 +179,11 @@ namespace StumbleClone.Player
             transform.position = _spawnPoint;
             _rb.linearVelocity = Vector3.zero;
             _rb.angularVelocity = Vector3.zero;
+            // Clear any lingering knockback input-lock. Without this, a knockback that lands just
+            // before a grace-window re-snap leaves _inputLockUntil in the future, so ApplyMovement()
+            // early-returns forever and WASD goes dead. Respawn() already does this; ReSnapToSpawn
+            // must too (the asymmetry was the "WASD stops working" bug).
+            _inputLockUntil = 0f;
             if (logSpawnDiagnostics && Time.time - _lastResnapLogTime > 0.25f)
             {
                 _lastResnapLogTime = Time.time;

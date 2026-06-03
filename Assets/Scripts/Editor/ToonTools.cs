@@ -22,6 +22,7 @@ namespace StumbleClone.EditorTools
         {
             "Skybox/Panoramic",         // procedural daytime sky (SceneAtmosphere) — the backdrop
             "StumbleClone/Toon",        // character cel shader + outline
+            "Unlit/Texture",            // skydome backdrop sphere (SceneAtmosphere) — built at runtime
         };
 
         public static void EnsureAlwaysIncludedShaders()

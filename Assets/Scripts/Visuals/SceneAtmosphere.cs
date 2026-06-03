@@ -61,21 +61,108 @@ namespace StumbleClone.Visuals
 
         // ---- Sky ---------------------------------------------------------------
 
+        // The skybox material we build, kept so the enforce loop can re-assign it if anything
+        // overrides RenderSettings.skybox after we set it.
+        private Material _skyMat;
+        private Texture2D _skyTex;     // the panorama, reused by the skydome backdrop
+        private GameObject _skydome;   // camera-following inverted sphere — the guaranteed-visible sky
+        private const float SkydomeRadius = 500f; // world units; camera far clip is bumped above this
+
         private void ApplySky()
         {
+            _skyTex = BuildDaytimePanorama(1024, 512);
+
             Shader sh = Shader.Find("Skybox/Panoramic");
             if (sh != null)
             {
-                Texture2D tex = BuildDaytimePanorama(1024, 512);
-                var mat = new Material(sh);
-                mat.SetTexture("_MainTex", tex);
-                if (mat.HasProperty("_Exposure")) mat.SetFloat("_Exposure", 1.25f);
-                RenderSettings.skybox = mat;
+                _skyMat = new Material(sh);
+                _skyMat.SetTexture("_MainTex", _skyTex);
+                if (_skyMat.HasProperty("_Exposure")) _skyMat.SetFloat("_Exposure", 1.25f);
+                RenderSettings.skybox = _skyMat;
                 DynamicGI.UpdateEnvironment();
             }
+            else
+            {
+                Debug.LogWarning("[SceneAtmosphere] 'Skybox/Panoramic' not found — relying on skydome backdrop.");
+            }
 
+            // The skybox pass is unreliable under some URP camera setups (overlay/stacked cameras,
+            // render-type quirks) — the symptom being a bound skybox that simply never draws. The
+            // skydome is plain geometry, so it ALWAYS renders, guaranteeing a visible sky regardless.
+            BuildSkydome();
+
+            EnforceSky();
+            StartCoroutine(EnforceSkyContinuously());
+        }
+
+        // A large inverted sphere textured with the panorama. Negative X scale flips the winding so
+        // the (back) inner faces become front-facing and render from inside with a standard Cull-Back
+        // unlit shader; the Background render queue + far depth keep it behind all scene geometry.
+        private void BuildSkydome()
+        {
+            if (_skydome != null || _skyTex == null) return;
+
+            Shader unlit = Shader.Find("Unlit/Texture");
+            if (unlit == null) return; // no safe unlit shader available — skybox is the only path
+
+            _skydome = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            _skydome.name = "Skydome";
+            var col = _skydome.GetComponent<Collider>();
+            if (col != null) Destroy(col);
+
+            _skydome.transform.localScale = new Vector3(-SkydomeRadius * 2f, SkydomeRadius * 2f, SkydomeRadius * 2f);
+
+            var rend = _skydome.GetComponent<Renderer>();
+            rend.shadowCastingMode = ShadowCastingMode.Off;
+            rend.receiveShadows = false;
+            var mat = new Material(unlit) { mainTexture = _skyTex };
+            mat.renderQueue = (int)RenderQueue.Background; // draw before scene geometry
+            rend.sharedMaterial = mat;
+
+            var cam = Camera.main;
+            _skydome.transform.position = cam != null ? cam.transform.position : Vector3.zero;
+        }
+
+        // Keep the dome centred on the camera so it reads as an infinitely distant sky and the player
+        // can never reach its edge.
+        private void LateUpdate()
+        {
+            if (_skydome == null) return;
+            var cam = Camera.main;
+            if (cam != null) _skydome.transform.position = cam.transform.position;
+        }
+
+        // Re-assert the skybox + camera clear flags, and make sure the far clip plane is beyond the
+        // skydome so it isn't clipped away. Cheap and idempotent.
+        private void EnforceSky()
+        {
+            if (_skyMat != null && RenderSettings.skybox != _skyMat) RenderSettings.skybox = _skyMat;
             foreach (var cam in Camera.allCameras)
-                cam.clearFlags = CameraClearFlags.Skybox;
+            {
+                if (cam.clearFlags != CameraClearFlags.Skybox) cam.clearFlags = CameraClearFlags.Skybox;
+                if (cam.farClipPlane < SkydomeRadius * 1.5f) cam.farClipPlane = SkydomeRadius * 1.5f;
+            }
+        }
+
+        // ApplySky used to run exactly once in Start(). A camera that becomes enabled or is created
+        // AFTER that single frame (or any code that reassigns RenderSettings.skybox) would then keep
+        // a flat/solid-colour clear — i.e. "no background". Re-assert every frame for a short window
+        // so any late camera is caught, then log a one-line diagnostic of the final state.
+        private IEnumerator EnforceSkyContinuously()
+        {
+            float deadline = Time.time + 2.5f;
+            int maxCameras = 0;
+            while (Time.time <= deadline)
+            {
+                EnforceSky();
+                maxCameras = Mathf.Max(maxCameras, Camera.allCameras.Length);
+                yield return null;
+            }
+
+            string boundShader = RenderSettings.skybox != null && RenderSettings.skybox.shader != null
+                ? RenderSettings.skybox.shader.name : "<none>";
+            Debug.Log($"[SceneAtmosphere] sky ready — material={(_skyMat != null ? "built" : "MISSING")}, " +
+                      $"RenderSettings.skybox shader={boundShader}, cameras seen={maxCameras}");
         }
 
         // Equirectangular (lat-long) panorama: bright daytime gradient + sun glow + fluffy clouds.

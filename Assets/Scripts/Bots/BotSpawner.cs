@@ -107,6 +107,16 @@ namespace StumbleClone.Bots
                 float skill = Random.Range(skillMin, skillMax);
                 float aggression = BotDifficulty.Aggression;
                 bot.behavior = CreateBehavior(mode, skill);
+
+                // Guarantee every bot has a non-null edge-recovery target for EVERY mode. Without
+                // one, a bot shoved off the platform with no NavMesh within its scan radius just
+                // falls to its death (Race/Survival bots had no anchor at all). Prefer the arena
+                // centre, then the survival safe spot, then the finish line, then the spawner itself.
+                bot.RecoveryAnchor = arenaCenter != null ? arenaCenter
+                    : safeAnchor != null ? safeAnchor
+                    : finishLine != null ? finishLine
+                    : transform;
+
                 if (bot.Agent != null)
                 {
                     // Keep pace with the human: floor the base at the player's run speed (6) even for

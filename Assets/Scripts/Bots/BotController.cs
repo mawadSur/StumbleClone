@@ -47,6 +47,7 @@ namespace StumbleClone.Bots
         private float _nextTickTime;
         private float _nextPushTime;
         private float _nextRecoveryJump;
+        private float _recoverStartTime; // when the current off-mesh recovery began (for the stuck-rescue timeout)
 
         // Combat tuning applied per difficulty by the spawner (aggressive bots push harder/more often).
         private float _pushCooldownMul = 1f;
@@ -124,7 +125,7 @@ namespace StumbleClone.Bots
             bool offMesh = _agent == null || !_agent.enabled || !_agent.isOnNavMesh;
             if (offMesh && !_jumping)
             {
-                if (!_recovering) { _recovering = true; _recoveryJumpsLeft = MaxRecoveryJumps; _nextRecoveryJump = 0f; }
+                if (!_recovering) { _recovering = true; _recoveryJumpsLeft = MaxRecoveryJumps; _nextRecoveryJump = 0f; _recoverStartTime = Time.time; }
                 RecoverTick();
                 return;
             }
@@ -145,6 +146,26 @@ namespace StumbleClone.Bots
             if (_rb.isKinematic) _rb.isKinematic = false;
 
             Vector3 pos = transform.position;
+
+            // Stuck-rescue: if the bot has been off the mesh too long (wedged against a lip, or
+            // grounded on geometry the NavMesh doesn't cover) it would otherwise freeze in place or
+            // ride physics off the edge — the "bots stand still / die randomly" symptom. Hard-warp it
+            // back onto the nearest mesh around its recovery anchor and resume normal AI.
+            if (Time.time - _recoverStartTime > GameConstants.BotRecoveryTimeout && RecoveryAnchor != null &&
+                NavMesh.SamplePosition(RecoveryAnchor.position, out NavMeshHit anchorHit, 25f, NavMesh.AllAreas))
+            {
+                _rb.linearVelocity = Vector3.zero;
+                _rb.angularVelocity = Vector3.zero;
+                _rb.isKinematic = true;
+                transform.position = anchorHit.position;
+                if (_agent != null)
+                {
+                    _agent.enabled = true;
+                    if (_agent.isOnNavMesh) _agent.Warp(anchorHit.position);
+                }
+                _recovering = false;
+                return;
+            }
 
             Vector3 targetPos;
             if (NavMesh.SamplePosition(pos, out NavMeshHit nav, recoveryScanRadius, NavMesh.AllAreas))
@@ -292,8 +313,14 @@ namespace StumbleClone.Bots
 
             if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, navResamplingRadius, NavMesh.AllAreas))
             {
-                _rb.linearVelocity = Vector3.zero;
-                _rb.angularVelocity = Vector3.zero;
+                // Zero momentum only while still dynamic — setting velocity on an already-kinematic
+                // body throws a per-call warning (Unity ignores it). Making it kinematic clears
+                // velocity anyway, so the guard is purely to silence the log spam.
+                if (!_rb.isKinematic)
+                {
+                    _rb.linearVelocity = Vector3.zero;
+                    _rb.angularVelocity = Vector3.zero;
+                }
                 _rb.isKinematic = true;
                 transform.position = hit.position;
                 if (_agent != null)

@@ -3,6 +3,7 @@ using StumbleClone.Game;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace StumbleClone.UI
 {
@@ -15,6 +16,10 @@ namespace StumbleClone.UI
         private TMP_InputField _nameInput;
         private TMP_Text _difficultyLabel;
         private TMP_Text _skinLabel;
+        private TMP_Text _buyLabel;
+        private Image _buyImage;
+        private TMP_Text _tokenLabel;
+        private string _previewSkin; // the skin shown in the shop row (may differ from the equipped one)
         private GameObject _overlay;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -56,11 +61,27 @@ namespace StumbleClone.UI
             _nameInput = RuntimeUI.InputField(bg.transform, "Player", LeaderboardStore.GetPlayerName(),
                 new Vector2(0.5f, 0.63f), new Vector2(0f, -56f), new Vector2(470f, 64f));
 
-            // Skin — tap to cycle the player's character. Persisted; applied on spawn.
-            var skinBtn = RuntimeUI.Button(bg.transform, "SKIN: " + SkinCatalog.DisplayFor(SkinStore.Current),
-                UITheme.Secondary,
-                new Vector2(0.5f, 0.475f), Vector2.zero, new Vector2(460f, 64f), OnCycleSkin);
+            // Token balance chip, top-right — earned by winning rounds, spent in the shop below.
+            _tokenLabel = RuntimeUI.Label(bg.transform, "", 40,
+                new Vector2(1f, 1f), new Vector2(-40f, -34f), new Vector2(440f, 60f), TextAlignmentOptions.Right);
+            _tokenLabel.fontStyle = FontStyles.Bold;
+            _tokenLabel.color = UITheme.Gold;
+
+            // Skin shop row: the SKIN button (left) cycles a preview through the catalog; the
+            // BUY/EQUIP button (right) acts on the previewed skin — buying it if locked, or equipping
+            // it if owned. Owning is persisted (SkinInventory); equipping writes SkinStore.
+            _previewSkin = SkinStore.Current;
+            var skinBtn = RuntimeUI.Button(bg.transform, "", UITheme.Secondary,
+                new Vector2(0.5f, 0.475f), new Vector2(-120f, 0f), new Vector2(380f, 64f), OnCycleSkin);
             _skinLabel = skinBtn.GetComponentInChildren<TMP_Text>();
+
+            var buyBtn = RuntimeUI.Button(bg.transform, "", UITheme.Secondary,
+                new Vector2(0.5f, 0.475f), new Vector2(215f, 0f), new Vector2(210f, 64f), OnBuyOrEquip);
+            _buyLabel = buyBtn.GetComponentInChildren<TMP_Text>();
+            _buyImage = buyBtn.GetComponent<Image>();
+
+            RefreshTokens();
+            RefreshSkinRow();
 
             // Bot difficulty — tap to cycle Easy / Normal / Hard. Persisted for every round.
             var diffBtn = RuntimeUI.Button(bg.transform, "BOTS: " + BotDifficulty.Label,
@@ -84,11 +105,56 @@ namespace StumbleClone.UI
             if (_difficultyLabel != null) _difficultyLabel.text = "BOTS: " + BotDifficulty.Label;
         }
 
+        // Advance the previewed skin only — equipping/buying is the BUY/EQUIP button's job.
         private void OnCycleSkin()
         {
-            string next = SkinCatalog.Next(SkinStore.Current);
-            SkinStore.Current = next;
-            if (_skinLabel != null) _skinLabel.text = "SKIN: " + SkinCatalog.DisplayFor(next);
+            _previewSkin = SkinCatalog.Next(_previewSkin);
+            RefreshSkinRow();
+        }
+
+        // Act on the previewed skin: equip it if owned, otherwise buy it (and equip on success).
+        private void OnBuyOrEquip()
+        {
+            if (SkinInventory.IsOwned(_previewSkin))
+            {
+                SkinStore.Current = _previewSkin; // equip
+            }
+            else if (SkinInventory.TryBuy(_previewSkin))
+            {
+                SkinStore.Current = _previewSkin; // bought — equip immediately
+                RefreshTokens();
+            }
+            // Not owned and not affordable: no-op (the label already shows the price).
+            RefreshSkinRow();
+        }
+
+        private void RefreshTokens()
+        {
+            if (_tokenLabel != null) _tokenLabel.text = "TOKENS: " + TokenWallet.Balance;
+        }
+
+        private void RefreshSkinRow()
+        {
+            string id = _previewSkin;
+            bool owned = SkinInventory.IsOwned(id);
+            bool equipped = owned && SkinStore.Current == id;
+            string name = SkinCatalog.DisplayFor(id);
+
+            if (_skinLabel != null)
+                _skinLabel.text = "SKIN: " + name + (owned ? (equipped ? "  - ON" : "") : "  - LOCKED");
+
+            if (_buyLabel != null)
+            {
+                if (!owned) _buyLabel.text = "BUY " + SkinInventory.PriceOf(id);
+                else if (equipped) _buyLabel.text = "EQUIPPED";
+                else _buyLabel.text = "EQUIP";
+            }
+
+            if (_buyImage != null)
+            {
+                bool actionable = !owned ? TokenWallet.CanAfford(SkinInventory.PriceOf(id)) : !equipped;
+                _buyImage.color = actionable ? UITheme.Secondary : UITheme.Neutral;
+            }
         }
 
         private void OnPlay()

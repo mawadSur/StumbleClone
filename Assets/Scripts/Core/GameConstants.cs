@@ -39,5 +39,14 @@ namespace StumbleClone.Core
 
         // World
         public const float WorldKillY = -25f; // anything below this Y is eliminated/respawned by mode
+
+        // Economy (token rewards). Tokens are earned per round and spent in the title-screen shop.
+        public const int TokensForWin = 100;    // awarded when the human player wins the round
+        public const int TokensForFinish = 25;  // consolation: player took part but didn't win
+
+        // Bot edge-recovery: if a knocked-off bot can't get back onto the NavMesh within this many
+        // seconds it is hard-warped to the nearest mesh around its RecoveryAnchor, so it never
+        // freezes off-mesh or rides physics off the map (the "bots stand still / die randomly" bug).
+        public const float BotRecoveryTimeout = 4f;
     }
 }
