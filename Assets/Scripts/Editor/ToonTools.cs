@@ -22,7 +22,9 @@ namespace StumbleClone.EditorTools
         {
             "Skybox/Panoramic",         // procedural daytime sky (SceneAtmosphere) — the backdrop
             "StumbleClone/Toon",        // character cel shader + outline
-            "Unlit/Texture",            // skydome backdrop sphere (SceneAtmosphere) — built at runtime
+            "Universal Render Pipeline/Unlit", // skydome backdrop sphere (SceneAtmosphere) — URP-native unlit
+            "Sprites/Default",          // skydome fallback (always URP-safe unlit)
+            "Unlit/Texture",            // skydome last-ditch fallback
         };
 
         public static void EnsureAlwaysIncludedShaders()

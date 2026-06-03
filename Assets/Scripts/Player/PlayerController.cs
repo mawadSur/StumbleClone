@@ -331,7 +331,10 @@ namespace StumbleClone.Player
                 // jumps don't float weightlessly back to earth — the rise stays floaty, the descent
                 // gets punchy and decisive. Gated out during a dash so the dash's gravity-cancel
                 // (above) stays the sole vertical authority for that window.
-                if (_rb.linearVelocity.y < 0f)
+                // Only while airborne — grounded falling on a ramp must use normal gravity so the
+                // walkable-slope anti-slide (which cancels exactly Physics.gravity) stays correct
+                // and the extra pull can't drag the player down a tilted arena.
+                if (!_grounded && _rb.linearVelocity.y < 0f)
                     _rb.AddForce(Physics.gravity * (GameConstants.FallMultiplier - 1f), ForceMode.Acceleration);
             }
 

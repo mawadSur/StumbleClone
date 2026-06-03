@@ -102,20 +102,30 @@ namespace StumbleClone.Visuals
         {
             if (_skydome != null || _skyTex == null) return;
 
-            Shader unlit = Shader.Find("Unlit/Texture");
-            if (unlit == null) return; // no safe unlit shader available — skybox is the only path
+            // URP-NATIVE unlit shader. The legacy "Unlit/Texture" compiles but does NOT render under
+            // URP — that's why the dome stayed invisible every time. Use URP Unlit, fall back to the
+            // always-present Sprites/Default (also unlit + URP-safe).
+            Shader unlit = Shader.Find("Universal Render Pipeline/Unlit");
+            if (unlit == null) unlit = Shader.Find("Sprites/Default");
+            if (unlit == null) unlit = Shader.Find("Unlit/Texture");
+            if (unlit == null) return;
 
             _skydome = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             _skydome.name = "Skydome";
             var col = _skydome.GetComponent<Collider>();
             if (col != null) Destroy(col);
 
-            _skydome.transform.localScale = new Vector3(-SkydomeRadius * 2f, SkydomeRadius * 2f, SkydomeRadius * 2f);
+            // Positive scale + Cull Off so we see the INSIDE of the sphere from the centre, instead of
+            // relying on a fragile negative-scale winding flip (the old approach that didn't render).
+            _skydome.transform.localScale = Vector3.one * (SkydomeRadius * 2f);
 
             var rend = _skydome.GetComponent<Renderer>();
             rend.shadowCastingMode = ShadowCastingMode.Off;
             rend.receiveShadows = false;
-            var mat = new Material(unlit) { mainTexture = _skyTex };
+            var mat = new Material(unlit);
+            if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", _skyTex); // URP Unlit
+            mat.mainTexture = _skyTex;                                            // legacy / Sprites
+            if (mat.HasProperty("_Cull")) mat.SetFloat("_Cull", 0f);             // render from inside
             mat.renderQueue = (int)RenderQueue.Background; // draw before scene geometry
             rend.sharedMaterial = mat;
 

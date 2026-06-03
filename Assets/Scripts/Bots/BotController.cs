@@ -87,7 +87,7 @@ namespace StumbleClone.Bots
 
             _rb.isKinematic = true;
             _rb.interpolation = RigidbodyInterpolation.Interpolate;
-            _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            _rb.collisionDetectionMode = CollisionDetectionMode.Continuous; // match the player; better sweep contact when shoved off a rim
             _agent.speed = GameConstants.DefaultMoveSpeed;
         }
 
@@ -217,7 +217,10 @@ namespace StumbleClone.Bots
         {
             float halfHeight = _collider != null ? _collider.height * 0.5f : 1f;
             Vector3 origin = transform.position + Vector3.up * 0.05f;
-            return Physics.Raycast(origin, Vector3.down, halfHeight + 0.15f, ~0, QueryTriggerInteraction.Ignore);
+            // Strip Player/Bot layers so the ray can't self-hit this bot's own capsule (or another
+            // racer) and falsely report grounded — which would stop the recovery double-jump firing.
+            int groundMask = ~((1 << GameConstants.LayerPlayer) | (1 << GameConstants.LayerBot));
+            return Physics.Raycast(origin, Vector3.down, halfHeight + 0.15f, groundMask, QueryTriggerInteraction.Ignore);
         }
 
         public void Jump()
@@ -283,6 +286,11 @@ namespace StumbleClone.Bots
         public void Knockback(Vector3 force)
         {
             if (!_isAlive || _isFinished) return;
+            // Re-entrant guard: a bot already mid-knockback ignores additional pushes. Without this,
+            // chained shoves (7 bots in a scrum) stack KnockbackRoutines that each disable the agent
+            // for 1.2s and re-launch the dynamic body — a frame-rate-dependent way to get flung off
+            // and "die randomly". One knockback at a time.
+            if (_inKnockback) return;
             // SHIELD buff: absorb exactly one incoming hit, then expire. Consumed before the
             // knockback routine starts so the push reads as fully ignored.
             if (_shieldActive)
@@ -299,6 +307,9 @@ namespace StumbleClone.Bots
 
             if (_agent != null && _agent.enabled) _agent.enabled = false;
             _rb.isKinematic = false;
+            // Apply the impulse on a physics step (not mid-Update) so the knockback strength is
+            // frame-rate independent — the body has just gone dynamic, so wait one FixedUpdate first.
+            yield return new WaitForFixedUpdate();
             _rb.AddForce(force + Vector3.up * GameConstants.KnockbackUpward, ForceMode.Impulse);
 
             yield return new WaitForSeconds(knockbackRecoverySeconds);
