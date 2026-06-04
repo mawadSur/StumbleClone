@@ -113,10 +113,18 @@ namespace StumbleClone.UI
                 new Vector2(0.5f, 0.27f), new Vector2(-235f, 0f), new Vector2(420f, 92f), OnPlay);
             RuntimeUI.Button(bg.transform, "MULTIPLAYER", UITheme.Accent,
                 new Vector2(0.5f, 0.27f), new Vector2(235f, 0f), new Vector2(420f, 92f), OnMultiplayer);
+            // Two service rows below PLAY. Top row (0.19) = progression: PASS (battle pass + daily/
+            // weekly quests) and LOCKER (emotes + victory poses). Bottom row (0.11) = PERKS shop +
+            // LEADERBOARD. All four stay 290-wide so the longer labels never clip, and the bands are
+            // spaced so neither row touches the taller PLAY band (0.27) above nor the bottom safe-area.
+            RuntimeUI.Button(bg.transform, "PASS", UITheme.Accent,
+                new Vector2(0.5f, 0.19f), new Vector2(-125f, 0f), new Vector2(290f, 60f), OpenSeasonPass);
+            RuntimeUI.Button(bg.transform, "LOCKER", UITheme.Accent,
+                new Vector2(0.5f, 0.19f), new Vector2(125f, 0f), new Vector2(290f, 60f), OpenLocker);
             RuntimeUI.Button(bg.transform, "PERKS", UITheme.Secondary,
-                new Vector2(0.5f, 0.13f), new Vector2(-125f, 0f), new Vector2(290f, 66f), OpenPerksPanel);
+                new Vector2(0.5f, 0.11f), new Vector2(-125f, 0f), new Vector2(290f, 60f), OpenPerksPanel);
             RuntimeUI.Button(bg.transform, "LEADERBOARD", UITheme.Secondary,
-                new Vector2(0.5f, 0.13f), new Vector2(125f, 0f), new Vector2(290f, 66f), OnLeaderboard);
+                new Vector2(0.5f, 0.11f), new Vector2(125f, 0f), new Vector2(290f, 60f), OnLeaderboard);
 
             OverlayIntro.Play(_overlay);
         }
@@ -207,6 +215,18 @@ namespace StumbleClone.UI
         private void OnLeaderboard()
         {
             if (LeaderboardUI.Instance != null) LeaderboardUI.Instance.Open();
+        }
+
+        // Open the seasonal Battle Pass + daily/weekly quests modal (self-instantiated overlay).
+        private void OpenSeasonPass()
+        {
+            SeasonPassUI.Open();
+        }
+
+        // Open the cosmetics LOCKER (emotes + victory poses, live 3D preview).
+        private void OpenLocker()
+        {
+            LockerUI.Open();
         }
 
         // ---- Modal panels (mode select, perks shop) -----------------------------

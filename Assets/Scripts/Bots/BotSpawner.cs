@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using StumbleClone.Core;
 using StumbleClone.Game;
 using UnityEngine;
@@ -24,25 +25,107 @@ namespace StumbleClone.Bots
         [Tooltip("Index of the first spawn point bots use. Set to 1 in the arena so bots don't stack on the player, who takes spawn point 0.")]
         [SerializeField] private int spawnPointOffset = 0;
 
+        // ---- Networked-mode control --------------------------------------------------------------
+        // In an online match the SERVER decides how many bots are needed to backfill empty human
+        // slots, so it suppresses the offline auto-spawn and drives SpawnBots/DespawnExtraBots itself
+        // (see StumbleClone.Net.NetworkGame). Offline this stays false and behaviour is unchanged.
+        private bool _networkedMode;
+
+        // Bots this spawner created, in spawn order. Used so DespawnExtraBots can remove the most
+        // recently added bots (newest-first) without disturbing the rest of the field. Only populated
+        // through SpawnInternal, so the offline SpawnAll path also fills it (harmless — offline never
+        // despawns), keeping a single code path.
+        private readonly List<BotController> _spawned = new List<BotController>(8);
+
+        /// Number of live bots this spawner currently owns (prunes destroyed entries lazily).
+        public int SpawnedBotCount
+        {
+            get
+            {
+                PruneSpawned();
+                return _spawned.Count;
+            }
+        }
+
+        /// <summary>
+        /// Switch this spawner between offline (auto-fill 7 in <see cref="Start"/>) and networked mode
+        /// (server-driven backfill via <see cref="SpawnBots"/>/<see cref="DespawnExtraBots"/>). Calling
+        /// this with <c>true</c> before <see cref="Start"/> runs is what NetworkGame uses to suppress the
+        /// offline auto-spawn so it controls the count. Idempotent.
+        /// </summary>
+        public void SetNetworkedMode(bool networked) => _networkedMode = networked;
+
         private void Start()
         {
-            if (spawnOnStart) SpawnAll();
+            // Offline: auto-fill the field exactly as before. Networked: NetworkGame owns the count and
+            // will call SpawnBots/DespawnExtraBots, so we must NOT also auto-spawn here (would double up).
+            if (spawnOnStart && !_networkedMode) SpawnAll();
         }
 
         public void SpawnAll()
         {
+            SpawnInternal(botCount, firstRacerId);
+        }
+
+        /// <summary>
+        /// Spawn <paramref name="count"/> additional bots (server-side networked backfill). Bots are
+        /// appended to the field; their racer ids continue past the highest id this spawner has used so
+        /// they never collide with existing racers. Returns the number actually spawned.
+        /// </summary>
+        public int SpawnBots(int count)
+        {
+            if (count <= 0) return 0;
+            return SpawnInternal(count, NextRacerId());
+        }
+
+        /// <summary>
+        /// Despawn up to <paramref name="count"/> of the most-recently-spawned bots (server-side, when a
+        /// human joins and frees up a slot). Removes newest-first so the longest-lived bots stay. Returns
+        /// the number actually removed.
+        /// </summary>
+        public int DespawnExtraBots(int count)
+        {
+            if (count <= 0) return 0;
+            PruneSpawned();
+
+            int removed = 0;
+            for (int i = _spawned.Count - 1; i >= 0 && removed < count; i--)
+            {
+                BotController bot = _spawned[i];
+                _spawned.RemoveAt(i);
+                if (bot != null)
+                {
+                    // OnDisable unregisters the bot from RacerRegistry, so win/rank logic stops counting it.
+                    Destroy(bot.gameObject);
+                    removed++;
+                }
+            }
+            return removed;
+        }
+
+        /// <summary>
+        /// Shared spawn body for both the offline <see cref="SpawnAll"/> and the networked
+        /// <see cref="SpawnBots"/> path. <paramref name="count"/> bots are created starting at racer id
+        /// <paramref name="startRacerId"/>. Returns the number actually spawned. Offline behaviour is
+        /// identical to the original SpawnAll (called with botCount / firstRacerId).
+        /// </summary>
+        private int SpawnInternal(int count, int startRacerId)
+        {
             if (botPrefab == null)
             {
                 Debug.LogError("BotSpawner: botPrefab is not assigned.");
-                return;
+                return 0;
             }
             if (spawnPoints == null || spawnPoints.Length == 0)
             {
                 Debug.LogError("BotSpawner: no spawn points assigned.");
-                return;
+                return 0;
             }
 
-            BotNameGenerator.Reset();
+            // Only reset the shared name generator for a full field build (offline SpawnAll / the first
+            // networked fill). Incremental backfill keeps the existing names unique by NOT resetting.
+            if (_spawned.Count == 0)
+                BotNameGenerator.Reset();
 
             // Difficulty (set in the main menu) picks the per-bot skill range. Skill drives agent
             // speed, charge aggression and hazard-dodge reliability, so this scales the whole field.
@@ -57,7 +140,7 @@ namespace StumbleClone.Bots
             // falling back to the registry if the tag lookup misses.
             GameObject playerGo = GameObject.FindGameObjectWithTag(GameConstants.TagPlayer);
             Transform playerT = playerGo != null ? playerGo.transform : RacerRegistry.Player?.Transform;
-            var usable = new System.Collections.Generic.List<Transform>(spawnPoints.Length);
+            var usable = new List<Transform>(spawnPoints.Length);
             for (int s = 0; s < spawnPoints.Length; s++)
             {
                 Transform sp = spawnPoints[s];
@@ -75,11 +158,15 @@ namespace StumbleClone.Bots
                 for (int s = 0; s < spawnPoints.Length; s++)
                     if (spawnPoints[s] != null) usable.Add(spawnPoints[s]);
 
+            // Offset the spawn-point walk by how many bots already exist so backfilled bots don't all
+            // pile onto the same point as the first wave. Offline (first call) this is just spawnPointOffset.
+            int pointBase = spawnPointOffset + _spawned.Count;
+
             int spawned = 0;
-            int target = Mathf.Max(0, botCount);
+            int target = Mathf.Max(0, count);
             for (int i = 0; i < target; i++)
             {
-                Transform sp = usable[(i + spawnPointOffset) % usable.Count];
+                Transform sp = usable[(i + pointBase) % usable.Count];
                 Vector3 pos = sp != null ? sp.position : transform.position;
                 Quaternion rot = sp != null ? sp.rotation : Quaternion.identity;
 
@@ -99,7 +186,7 @@ namespace StumbleClone.Bots
                     continue;
                 }
 
-                bot.racerId = firstRacerId + i;
+                bot.racerId = startRacerId + i;
                 bot.displayName = BotNameGenerator.GetUnique();
 
                 // Per-bot skill (0.35..1) drives both move speed and behavior aggression/reaction
@@ -133,8 +220,30 @@ namespace StumbleClone.Bots
                 bot.SetCombatTuning(Mathf.Lerp(1f, 0.5f, aggression), Mathf.Lerp(1f, 1.3f, aggression));
 
                 go.name = "Bot_" + bot.displayName;
+                _spawned.Add(bot);
                 spawned++;
             }
+
+            return spawned;
+        }
+
+        /// Drop destroyed/null bots from the tracking list (bots can die to a killzone independently of
+        /// despawn). Cheap linear sweep — the field is tiny (≤ ~8).
+        private void PruneSpawned()
+        {
+            for (int i = _spawned.Count - 1; i >= 0; i--)
+                if (_spawned[i] == null) _spawned.RemoveAt(i);
+        }
+
+        /// Next free racer id: continues past the highest id this spawner has assigned so backfilled bots
+        /// never reuse an id. Falls back to firstRacerId when the field is empty.
+        private int NextRacerId()
+        {
+            PruneSpawned();
+            int max = firstRacerId - 1;
+            for (int i = 0; i < _spawned.Count; i++)
+                if (_spawned[i] != null && _spawned[i].racerId > max) max = _spawned[i].racerId;
+            return max + 1;
         }
 
         private BotBehavior CreateBehavior(LevelMode m, float skill)

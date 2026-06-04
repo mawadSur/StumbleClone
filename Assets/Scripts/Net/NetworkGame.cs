@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using StumbleClone.Bots;
 using StumbleClone.Core;
 using Unity.Netcode;
 using Unity.Netcode.Components;
@@ -26,6 +27,11 @@ namespace StumbleClone.Net
     public static class NetworkGame
     {
         private static bool s_callbacksHooked;
+
+        /// Target number of racers in an online match (humans + backfill bots), i.e. the lobby's max
+        /// player count. The server tops up with bots so a thin lobby still feels full. Kept here (not in
+        /// GameConstants, which this file doesn't own) and mirrors MultiplayerService's default MaxPlayers=8.
+        public const int NetworkedFieldSize = 8;
 
         /// True once a host/server/client session is live (mirrors NetworkBootstrap.IsOnline; kept here so
         /// callers that only use NetworkGame don't need both types).
@@ -81,6 +87,7 @@ namespace StumbleClone.Net
             if (nm == null) return;
 
             nm.OnClientConnectedCallback += OnClientConnected;
+            nm.OnClientDisconnectCallback += OnClientDisconnected;
             nm.OnServerStarted += OnServerStarted;
             s_callbacksHooked = true;
         }
@@ -88,8 +95,12 @@ namespace StumbleClone.Net
         private static void OnServerStarted()
         {
             // Host/server: the local (host) client connects in the same flow; OnClientConnected places it.
-            // Nothing extra to do here for Phase 1 — kept as a clear extension point (replicated registry /
-            // win logic init belongs here in Phase 2).
+            // Switch the scene's BotSpawner into networked mode so it does NOT run its offline auto-fill —
+            // this server now owns the bot count and backfills empty slots itself (BackfillBots below).
+            // Then do an initial backfill in case the spawner already spawned/Started before we got here.
+            var spawner = GetBotSpawner();
+            if (spawner != null) spawner.SetNetworkedMode(true);
+            BackfillBots();
         }
 
         /// Fires on the SERVER for every client that connects (including the host's own client). NGO has
@@ -109,10 +120,77 @@ namespace StumbleClone.Net
                 // nothing to place; NetworkPlayerLink still wires input on the object once it spawns.
                 Debug.LogWarning($"[NetworkGame] No player object for client {clientId} on connect — " +
                     "skipping spawn placement (is NetworkConfig.PlayerPrefab set? run StumbleClone/Multiplayer/Setup).");
-                return;
+            }
+            else
+            {
+                PlaceAtSpawnPoint(playerObject, clientId);
             }
 
-            PlaceAtSpawnPoint(playerObject, clientId);
+            // A human took a slot: shed a backfill bot to keep the field at NetworkedFieldSize.
+            BackfillBots();
+        }
+
+        /// Fires on the SERVER when a client leaves. Their owned Player despawns automatically; we top the
+        /// field back up with a bot so a lobby that empties out still feels full.
+        private static void OnClientDisconnected(ulong clientId)
+        {
+            var nm = NetworkManager.Singleton;
+            if (nm == null || !nm.IsServer) return; // backfill is a server-authority concern only
+            BackfillBots();
+        }
+
+        /// Reconcile the bot count so humans + bots == <see cref="NetworkedFieldSize"/>. Server-side and
+        /// live-session only; the offline single-player path never reaches here (no NetworkManager listening),
+        /// so BotSpawner's own auto-fill of 7 is untouched. Adds bots when humans are scarce, removes them
+        /// when humans join. Safe to call repeatedly (it only spawns/despawns the delta).
+        private static void BackfillBots()
+        {
+            var nm = NetworkManager.Singleton;
+            if (nm == null || !nm.IsServer || !nm.IsListening) return;
+
+            var spawner = GetBotSpawner();
+            if (spawner == null) return; // scene has no bots (e.g. a lobby-only scene) — nothing to backfill
+
+            // Always re-assert networked mode here: if this spawner's Start() runs AFTER the session is
+            // already live (e.g. a gameplay scene loaded post-host), this is the point at which we suppress
+            // its offline auto-fill — and even if it already auto-filled 7, the reconcile below trims to target.
+            spawner.SetNetworkedMode(true);
+
+            // ConnectedClients exists only on the server and counts every connected human (incl. the host).
+            int humans = nm.ConnectedClientsIds != null ? nm.ConnectedClientsIds.Count : 0;
+            int desiredBots = Mathf.Max(0, NetworkedFieldSize - humans);
+            int currentBots = spawner.SpawnedBotCount;
+
+            if (currentBots < desiredBots)
+                spawner.SpawnBots(desiredBots - currentBots);
+            else if (currentBots > desiredBots)
+                spawner.DespawnExtraBots(currentBots - desiredBots);
+        }
+
+        /// Find the active scene's BotSpawner (one per gameplay scene). Returns null in scenes without bots.
+        private static BotSpawner GetBotSpawner() => Object.FindAnyObjectByType<BotSpawner>();
+
+        // ---- Per-scene self-bootstrap -------------------------------------------------------------------
+        // The session may already be live (host started in the menu/lobby) when a gameplay scene loads, so
+        // the new scene's BotSpawner would otherwise run its offline auto-fill before any NGO callback fires.
+        // We subscribe to SceneManager.sceneLoaded (the same always-on pattern SceneAtmosphere/EliminationFeed
+        // use) and reconcile the bot count for the freshly loaded scene. No-ops entirely when not a live server,
+        // so single-player is unaffected.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void Bootstrap()
+        {
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded -= OnSceneLoaded; // guard double-subscribe (domain reload off)
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += OnSceneLoaded;
+        }
+
+        private static void OnSceneLoaded(
+            UnityEngine.SceneManagement.Scene scene,
+            UnityEngine.SceneManagement.LoadSceneMode loadMode)
+        {
+            // sceneLoaded fires before the scene objects' first Start(), so setting networked mode inside
+            // BackfillBots here suppresses the BotSpawner's offline auto-fill in time. Only acts as a live
+            // server — offline (NetworkManager not listening) this returns immediately.
+            BackfillBots();
         }
 
         /// Move the given player object to a spawn point. Uses the scene's "Respawn"-tagged transforms
