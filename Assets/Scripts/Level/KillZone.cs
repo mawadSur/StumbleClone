@@ -11,6 +11,17 @@ namespace StumbleClone.Level
         [SerializeField] private Vector3 defaultRespawnPoint = new Vector3(0f, 2f, 0f);
         [SerializeField] private LevelMode fallbackMode = LevelMode.Race;
 
+        private void Awake()
+        {
+            // The kill volume doubles as a visible translucent-RED box baked into each level scene
+            // (the level builders gave the trigger cube a red URP material). Players found that red
+            // floor under the arena distracting on a fall, so hide its renderer at runtime — falling
+            // now reveals the night sky / scene below instead of a red box. The trigger collider is
+            // left untouched, so falling off still eliminates / respawns exactly as before.
+            var rend = GetComponent<Renderer>();
+            if (rend != null) rend.enabled = false;
+        }
+
         private void Reset()
         {
             gameObject.tag = GameConstants.TagKillzone;
