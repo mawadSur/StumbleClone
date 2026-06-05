@@ -73,7 +73,7 @@ namespace StumbleClone.Game
         {
             gameOver = true;
             var player = RacerRegistry.Player;
-            bool playerWon = winner != null && player != null && ReferenceEquals(winner, player);
+            bool playerWon = RoundOutcome.PlayerWon(winner); // shared definition — keeps QuestSystem in lockstep
             int playerRank = ComputePlayerRank(player);
             float duration = Time.time - _levelStartTime;
 

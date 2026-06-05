@@ -40,7 +40,11 @@ namespace StumbleClone.Game
             // top of (and after) the equipped perk. These are short bursts for the round start.
             if (AbilityStore.PowerupCount("rocket") > 0 && AbilityStore.ConsumePowerup("rocket"))
                 player.ApplySpeedBoost(1.4f, 10f);
-            if (AbilityStore.PowerupCount("bubble") > 0 && AbilityStore.ConsumePowerup("bubble"))
+            // Bubble grants a shield — but a shield is a single one-use flag, so if the player already
+            // has one armed (e.g. from the Guardian perk above) a second grant does nothing. Skip the
+            // consume in that case (&& short-circuits) so the charge is refunded rather than burned for
+            // no effect. The player keeps the Bubble for a round where it actually matters.
+            if (AbilityStore.PowerupCount("bubble") > 0 && !player.ShieldActive && AbilityStore.ConsumePowerup("bubble"))
                 player.GrantShield();
             if (AbilityStore.PowerupCount("megahop") > 0 && AbilityStore.ConsumePowerup("megahop"))
                 player.GrantJumpBoost(1.5f, 10f);

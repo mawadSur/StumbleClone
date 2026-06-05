@@ -98,6 +98,12 @@ namespace StumbleClone.Game
             GameEvents.RacerEliminated += OnRacerEliminated;
             TokenWallet.Changed += OnTokensChanged;
 
+            // Seed the TokensEarned baseline from the persisted wallet NOW, so the first token change
+            // of the session (e.g. a fresh install's very first round payout) registers as a real
+            // positive delta instead of being swallowed as the lazy baseline capture in OnTokensChanged.
+            // Without this, a clean install's first earn credits 0 toward the "earn N tokens" quests.
+            _lastBalance = TokenWallet.Balance;
+
             EnsureFresh();
         }
 
@@ -142,9 +148,9 @@ namespace StumbleClone.Game
         {
             Advance(QuestMetric.RoundsPlayed, 1);
 
-            var player = RacerRegistry.Player;
-            bool playerWon = winner != null && player != null && ReferenceEquals(winner, player);
-            if (playerWon) Advance(QuestMetric.RoundsWon, 1);
+            // Shared "did the human win" definition (RoundOutcome) so this can never drift from
+            // GameManager's payout/doubler logic.
+            if (RoundOutcome.PlayerWon(winner)) Advance(QuestMetric.RoundsWon, 1);
         }
 
         private static void OnRacerEliminated(IRacer racer)

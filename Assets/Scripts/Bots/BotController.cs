@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using StumbleClone.Core;
+using StumbleClone.Obstacles;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -151,8 +152,18 @@ namespace StumbleClone.Bots
             // grounded on geometry the NavMesh doesn't cover) it would otherwise freeze in place or
             // ride physics off the edge — the "bots stand still / die randomly" symptom. Hard-warp it
             // back onto the nearest mesh around its recovery anchor and resume normal AI.
+            // Stuck-rescue search radius. Normally a wide 25m sweep around the anchor. BUT during the
+            // Knockout shrink the platform can be far smaller than 25m, and sampling that wide can warp
+            // the bot onto stale NavMesh that has already shrunk away, or onto the doomed rim it's about
+            // to fall off. When a shrink is live, clamp the search to sit well INSIDE the current floor:
+            // the centre region (where the Last-Stand recovery anchor sits) is the last to vanish, so a
+            // point within ~0.85x the live safe radius of the anchor is always solid ground.
+            float rescueRadius = 25f;
+            if (ArenaShrinker.Active)
+                rescueRadius = Mathf.Clamp(ArenaShrinker.CurrentSafeRadius * 0.85f, 2f, 25f);
+
             if (Time.time - _recoverStartTime > GameConstants.BotRecoveryTimeout && RecoveryAnchor != null &&
-                NavMesh.SamplePosition(RecoveryAnchor.position, out NavMeshHit anchorHit, 25f, NavMesh.AllAreas))
+                NavMesh.SamplePosition(RecoveryAnchor.position, out NavMeshHit anchorHit, rescueRadius, NavMesh.AllAreas))
             {
                 _rb.linearVelocity = Vector3.zero;
                 _rb.angularVelocity = Vector3.zero;
