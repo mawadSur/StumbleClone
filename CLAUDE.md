@@ -25,7 +25,7 @@
 
 All gameplay scripts conform to the contract in `Assets/Scripts/Core/`:
 - `IRacer` — implemented by `PlayerController` (`StumbleClone.Player`) and `BotController` (`StumbleClone.Bots`)
-- `GameEvents` — global event bus (LevelStarted, LevelEnded, RacerFinished, RacerEliminated, RacerRankChanged, SurvivalTimerTick, ShrinkRadiusChanged)
+- `GameEvents` — global event bus (LevelStarted, LevelEnded, RacerFinished, RacerEliminated, RacerRankChanged, SurvivalTimerTick, WaveTelegraphed)
 - `RacerRegistry` — racers self-register in OnEnable
 - `GameConstants` — layers (Player=8, Bot=9, Obstacle=10, Ground=11, Killzone=12), tags (Player, Bot, Finish, Killzone, PushPad, Respawn), tuning knobs
 
