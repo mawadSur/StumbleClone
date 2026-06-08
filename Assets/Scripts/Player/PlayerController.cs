@@ -502,6 +502,9 @@ namespace StumbleClone.Player
             _rb.AddForce(force + Vector3.up * GameConstants.KnockbackUpward, ForceMode.Impulse);
             _inputLockUntil = Time.time + inputLockOnKnockback;
             if (_animator != null) _animator.TriggerKnockedDown();
+            // Cosmetic slapstick: a brief limp tumble in the hit direction. Visual-only — does not
+            // touch the impulse/movement above. Self-bootstrapping so no prefab wiring is needed.
+            (GetComponent<RagdollEffect>() ?? gameObject.AddComponent<RagdollEffect>()).Trigger(force);
             AudioManager.Play(Sfx.Hit);
             // Punchy impact freeze — only reached on a real hit (past spawn grace, shield not consumed).
             HitStop.Do(0.06f);

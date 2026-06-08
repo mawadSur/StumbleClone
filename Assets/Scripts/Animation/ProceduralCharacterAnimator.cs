@@ -37,12 +37,32 @@ namespace StumbleClone.Animation
         private float _landTimer;
         private float _landImpact = 1f; // 0..1 strength of the active landing squash
         private bool _victory;
+        private bool _suspended; // while true, LateUpdate yields the visual to an external driver (RagdollEffect)
+
+        /// The transform this animator drives (the character mesh root). Null until resolved in Awake
+        /// / SetVisual. Lets an external cosmetic effect (RagdollEffect) target the exact same transform.
+        public Transform Visual => visual;
 
         /// Point the animator at the mesh root to animate (usually the Animator's own transform).
         public void SetVisual(Transform t)
         {
             visual = t;
             CaptureBase();
+        }
+
+        /// Hand the visual off to (or reclaim it from) an external cosmetic driver. While suspended the
+        /// per-frame pose write is skipped so another component (e.g. RagdollEffect's tumble) can own the
+        /// transform; on resume the captured base pose is restored so locomotion picks up cleanly. Cosmetic
+        /// only — does not touch physics, movement, or any gameplay state.
+        public void Suspend(bool on)
+        {
+            _suspended = on;
+            if (!on && visual != null && _captured)
+            {
+                visual.localPosition = _basePos;
+                visual.localRotation = _baseRot;
+                visual.localScale = _baseScale;
+            }
         }
 
         private void Awake()
@@ -99,6 +119,9 @@ namespace StumbleClone.Animation
         private void LateUpdate()
         {
             if (visual == null || !_captured) return;
+            // Suspended: an external cosmetic driver (RagdollEffect) owns the visual this frame.
+            // Don't write a pose, or we'd fight its tumble. Resume restores the base pose for us.
+            if (_suspended) return;
             float dt = Time.deltaTime;
 
             // ---- Victory dance: bouncing twirl, held until cleared ------------------

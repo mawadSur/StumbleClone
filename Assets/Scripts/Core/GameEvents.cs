@@ -16,6 +16,10 @@ namespace StumbleClone.Core
         public static event Action<float> SurvivalTimerTick;    // seconds remaining
         public static event Action<string, SpawnDirection> WaveTelegraphed; // (patternName, rim direction)
 
+        /// Raised when a chaos round modifier fires — carries the modifier id string
+        /// so HUD, analytics, and quest system can react.
+        public static event Action<string> RoundModifierActivated;
+
         public static void RaiseLevelStarted(LevelMode mode) => LevelStarted?.Invoke(mode);
         public static void RaiseLevelEnded(IRacer winner) => LevelEnded?.Invoke(winner);
         public static void RaiseRacerFinished(IRacer r) => RacerFinished?.Invoke(r);
@@ -27,6 +31,7 @@ namespace StumbleClone.Core
         /// wave's leading rim octant so audio/UI can play a directional "tell".
         public static void RaiseWaveTelegraphed(string patternName, SpawnDirection direction)
             => WaveTelegraphed?.Invoke(patternName, direction);
+        public static void RaiseRoundModifierActivated(string modifierId) => RoundModifierActivated?.Invoke(modifierId);
 
         /// Clear all subscribers — call from scene unload guards to avoid stale references.
         public static void Reset()
@@ -38,6 +43,7 @@ namespace StumbleClone.Core
             RacerRankChanged = null;
             SurvivalTimerTick = null;
             WaveTelegraphed = null;
+            RoundModifierActivated = null;
         }
     }
 }

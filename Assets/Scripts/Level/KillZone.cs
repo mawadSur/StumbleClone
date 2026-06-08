@@ -34,18 +34,11 @@ namespace StumbleClone.Level
             var racer = other.GetComponentInParent<IRacer>();
             if (racer == null || !racer.IsAlive || racer.IsFinished) return;
 
-            // The human player gets one life in every mode: falling off eliminates for good
-            // (no respawn). The spectate/Play-Again flow takes over from there.
-            if (racer.IsPlayer)
-            {
-                racer.Eliminate();
-                return;
-            }
-
-            // Resolve the mode robustly: GameManager (menu flow) → the scene's own
-            // LevelSelfStart (Play-scene-directly flow) → serialized fallback. Without the
-            // LevelSelfStart hop, a directly-played LastStanding scene would fall back to
-            // Race and *respawn* the player on top instead of eliminating them.
+            // Resolve the mode FIRST, then let the mode decide elimination-vs-respawn for
+            // BOTH the player and bots. Resolution chain: GameManager (menu flow) → the
+            // scene's own LevelSelfStart (Play-scene-directly flow) → serialized fallback.
+            // Without the LevelSelfStart hop, a directly-played LastStanding scene would
+            // fall back to Race and *respawn* a racer on top instead of eliminating them.
             LevelMode mode;
             if (GameManager.Instance != null)
                 mode = GameManager.Instance.currentMode;
@@ -54,14 +47,17 @@ namespace StumbleClone.Level
             else
                 mode = fallbackMode;
 
-            // Last-alive elimination modes: falling off = out for good (one life).
+            // Last-alive elimination modes: falling off = out for good (one life), for the
+            // player AND bots alike. The spectate/Play-Again flow takes over from there.
             if (mode == LevelMode.LastStanding || mode == LevelMode.Survival)
             {
                 racer.Eliminate();
                 return;
             }
 
-            // Race: respawn at most recent checkpoint if available.
+            // Race (and any other non-elimination mode): respawn at the most recent
+            // checkpoint for BOTH the player and bots — a Race track with hazards that knock
+            // you off is meant to be recoverable via checkpoints, not instantly fatal.
             Vector3 respawn = defaultRespawnPoint;
             var cp = Checkpoint.For(racer);
             if (cp != null) respawn = cp.RespawnPosition;

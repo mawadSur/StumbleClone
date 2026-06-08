@@ -23,12 +23,14 @@ namespace StumbleClone.Player
 
         private PlayerAnimator _animator;
         private ThirdPersonCamera _cameraRig;   // resolved lazily for the on-hit camera jolt
+        private HeldItem _heldItem;             // optional held broom/slipper; null until one is collected
 
         private void Awake()
         {
             if (input == null) input = GetComponent<PlayerInputHandler>();
             if (selfCollider == null) selfCollider = GetComponent<CapsuleCollider>();
             _animator = GetComponent<PlayerAnimator>();
+            _heldItem = GetComponent<HeldItem>(); // may be added later on pickup; re-resolved lazily below
         }
 
         private void Update()
@@ -38,6 +40,13 @@ namespace StumbleClone.Player
             if (Time.time < _nextPushTime) return;
 
             _nextPushTime = Time.time + pushCooldown;
+
+            // Held-item hook: while the player holds a broom/slipper, the push button USES the item
+            // instead of a normal shove. HeldItem is added on pickup, so resolve it lazily if Awake
+            // ran before the first collect. With no item, TryUse() returns false and the push runs.
+            if (_heldItem == null) _heldItem = GetComponent<HeldItem>();
+            if (_heldItem != null && _heldItem.TryUse()) return;
+
             DoPush();
         }
 

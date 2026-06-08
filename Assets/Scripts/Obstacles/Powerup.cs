@@ -7,7 +7,9 @@ using UnityEngine;
 
 namespace StumbleClone.Obstacles
 {
-    /// The three collectible buff types granted by a <see cref="Powerup"/> pickup.
+    /// The collectible types granted by a <see cref="Powerup"/> pickup. The first three are timed/one-use
+    /// buffs applied directly to the racer; the last two (Broom/Slipper) are PLAYER-ONLY held ITEMS used
+    /// via the push button (granted through <see cref="StumbleClone.Player.HeldItem"/>).
     public enum PowerupType
     {
         /// Temporary run-speed boost.
@@ -15,7 +17,11 @@ namespace StumbleClone.Obstacles
         /// One-use guard that ignores the next knockback/push.
         Shield,
         /// Temporary higher jump.
-        SuperJump
+        SuperJump,
+        /// Held ITEM (player-only): a wide push-button swing that breaks after 3 uses.
+        Broom,
+        /// Held ITEM (player-only): a forward-thrown projectile, used once.
+        Slipper
     }
 
     /// A floating collectible buff for the Knockout arena. Built entirely at runtime
@@ -111,6 +117,8 @@ namespace StumbleClone.Obstacles
                 case PowerupType.Speed: BuildSpeed(); break;
                 case PowerupType.Shield: BuildShield(); break;
                 case PowerupType.SuperJump: BuildSuperJump(); break;
+                case PowerupType.Broom: BuildBroom(); break;
+                case PowerupType.Slipper: BuildSlipper(); break;
                 default: BuildShield(); break;
             }
         }
@@ -179,6 +187,39 @@ namespace StumbleClone.Obstacles
             }
         }
 
+        // Broom (tan/brown): a long elongated handle with a stubby angled bristle-block at the foot —
+        // reads as a sweeping broom. Body = the handle.
+        private void BuildBroom()
+        {
+            float d = Radius * 2f;
+            Transform handle = AddPrimitive(PrimitiveType.Cube, _visual, isBody: true);
+            handle.localScale = new Vector3(d * 0.16f, d * 1.05f, d * 0.16f);
+            handle.localRotation = Quaternion.Euler(0f, 0f, 22f);   // jaunty lean
+            handle.localPosition = new Vector3(d * 0.1f, d * 0.12f, 0f);
+
+            // Bristle block at the bottom of the handle (wider, flat, angled to match the lean).
+            Transform bristles = AddPrimitive(PrimitiveType.Cube, _visual, isBody: false);
+            bristles.localScale = new Vector3(d * 0.5f, d * 0.28f, d * 0.34f);
+            bristles.localPosition = new Vector3(-d * 0.28f, -d * 0.5f, 0f);
+            bristles.localRotation = Quaternion.Euler(0f, 0f, 22f);
+        }
+
+        // Slipper (red): a small flat sole with a low raised strap — reads as a thrown flip-flop.
+        // Body = the flat sole.
+        private void BuildSlipper()
+        {
+            float d = Radius * 2f;
+            Transform sole = AddPrimitive(PrimitiveType.Cube, _visual, isBody: true);
+            sole.localScale = new Vector3(d * 0.5f, d * 0.16f, d * 0.34f);
+            sole.localRotation = Quaternion.Euler(-12f, 0f, 0f);   // slight toe-up tilt
+
+            // Low strap arching over the front of the sole.
+            Transform strap = AddPrimitive(PrimitiveType.Cube, _visual, isBody: false);
+            strap.localScale = new Vector3(d * 0.34f, d * 0.1f, d * 0.1f);
+            strap.localPosition = new Vector3(0f, d * 0.16f, d * 0.06f);
+            strap.localRotation = Quaternion.Euler(-12f, 0f, 0f);
+        }
+
         // Spawn one primitive under <paramref name="parent"/>, strip its doubled-up collider, and
         // give it the shared glow material. The primitive flagged isBody is just named "Body" for
         // clarity; the emission pulse and collect-fade drive the shared _glowMat, not one renderer.
@@ -205,6 +246,8 @@ namespace StumbleClone.Obstacles
                 case PowerupType.Speed: return new Color(1f, 0.92f, 0.15f);     // yellow
                 case PowerupType.Shield: return new Color(0.15f, 0.85f, 1f);    // cyan
                 case PowerupType.SuperJump: return new Color(1f, 0.2f, 0.9f);   // magenta
+                case PowerupType.Broom: return new Color(0.78f, 0.55f, 0.25f);  // warm tan/brown
+                case PowerupType.Slipper: return new Color(1f, 0.35f, 0.4f);    // bright slipper red
                 default: return Color.white;
             }
         }
@@ -277,6 +320,8 @@ namespace StumbleClone.Obstacles
                 case PowerupType.Speed: player.ApplySpeedBoost(SpeedMultiplier, SpeedSeconds); break;
                 case PowerupType.Shield: player.GrantShield(); break;
                 case PowerupType.SuperJump: player.GrantJumpBoost(JumpMultiplier, JumpSeconds); break;
+                case PowerupType.Broom: GiveHeldItem(player, HeldItem.ItemKind.Broom); break;
+                case PowerupType.Slipper: GiveHeldItem(player, HeldItem.ItemKind.Slipper); break;
             }
         }
 
@@ -287,7 +332,20 @@ namespace StumbleClone.Obstacles
                 case PowerupType.Speed: bot.ApplySpeedBoost(SpeedMultiplier, SpeedSeconds); break;
                 case PowerupType.Shield: bot.GrantShield(); break;
                 case PowerupType.SuperJump: bot.GrantJumpBoost(JumpMultiplier, JumpSeconds); break;
+                // Broom/Slipper are PLAYER-ONLY held items — bots collecting them gain nothing
+                // (the pickup still pops so it isn't left blocking the track).
+                case PowerupType.Broom:
+                case PowerupType.Slipper:
+                    break;
             }
+        }
+
+        // Grant a held item to the player, attaching a HeldItem component on first use.
+        private static void GiveHeldItem(PlayerController player, HeldItem.ItemKind kind)
+        {
+            var held = player.GetComponent<HeldItem>();
+            if (held == null) held = player.gameObject.AddComponent<HeldItem>();
+            held.Give(kind);
         }
 
         // Disable the trigger immediately, play a tiny scale-up + fade pop, then destroy. Guarded

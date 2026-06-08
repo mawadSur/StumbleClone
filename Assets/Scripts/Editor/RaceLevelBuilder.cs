@@ -17,25 +17,29 @@ namespace StumbleClone.EditorTools
             Undo.RegisterCreatedObjectUndo(root, "Build Race Level");
 
             BuildLighting(root.transform);
-            float currentZ = 0f;
 
-            currentZ = BuildStartPlatform(root.transform, currentZ);
-            AddCheckpoint(root.transform, new Vector3(0f, 0.6f, currentZ - 15f), 0);
-            AddSpawnPoints(root.transform, new Vector3(0f, 1.2f, currentZ - 18f));
+            // CONTINUOUS floor: each section's box starts exactly where the previous ended.
+            // Track runs toward -Z. Floor boxes: y-center 0, y-size 1 (top surface at y=0.5).
+            // Width 14 throughout. Spawns/checkpoints stay inside solid floor segments so
+            // NavMeshAgents (bots) can path the whole way and respawns land on ground.
+            BuildStartPlatform(root.transform);                       // spans 0..-20
+            AddSpawnPoints(root.transform, new Vector3(0f, 1.2f, -18f));
+            AddCheckpoint(root.transform, new Vector3(0f, 0.6f, -15f), 0);
 
-            currentZ = BuildSpinningBarSection(root.transform, currentZ);
-            AddCheckpoint(root.transform, new Vector3(0f, 0.6f, currentZ - 2f), 1);
+            BuildBarSection(root.transform);                          // spans -20..-50
+            AddCheckpoint(root.transform, new Vector3(0f, 0.6f, -46f), 1);
 
-            currentZ = BuildHammerSection(root.transform, currentZ);
-            AddCheckpoint(root.transform, new Vector3(0f, 0.6f, currentZ - 2f), 2);
+            BuildHammerSection(root.transform);                       // spans -50..-86
+            AddCheckpoint(root.transform, new Vector3(0f, 0.6f, -82f), 2);
 
-            currentZ = BuildMovingPlatformSection(root.transform, currentZ);
-            AddCheckpoint(root.transform, new Vector3(0f, 0.6f, currentZ - 2f), 3);
+            BuildRamSection(root.transform);                          // spans -86..-120
+            AddCheckpoint(root.transform, new Vector3(0f, 0.6f, -116f), 3);
 
-            currentZ = BuildFinishPlatform(root.transform, currentZ);
+            Transform finishTransform = BuildFinishPlatform(root.transform); // spans -120..-148
+            AddCheckpoint(root.transform, new Vector3(0f, 0.6f, -124f), 4);
 
             BuildWorldKillZone(root.transform);
-            BuildBotSpawner(root.transform);
+            BuildBotSpawner(root.transform, finishTransform);
             BuildRaceManager(root.transform);
             BuilderUtils.AttachByName(root.transform, "LevelSelfStart", "StumbleClone.Game.LevelSelfStart", configure: comp =>
             {
@@ -43,7 +47,7 @@ namespace StumbleClone.EditorTools
             });
 
             Selection.activeGameObject = root;
-            Debug.Log("[RaceLevelBuilder] Built. Next: open Window > AI > Navigation, bake NavMesh, then save scene as Assets/Scenes/Level_Race.unity.");
+            Debug.Log("[RaceLevelBuilder] Built continuous race track (finish at Z=-146). Next: open Window > AI > Navigation, bake NavMesh, then save scene as Assets/Scenes/Level_Race.unity.");
         }
 
         private static void BuildLighting(Transform parent)
@@ -56,24 +60,24 @@ namespace StumbleClone.EditorTools
             light.intensity = 1.1f;
         }
 
-        private static float BuildStartPlatform(Transform parent, float startZ)
+        // StartPlatform: center Z=-10, size (14,1,20) -> spans 0..-20.
+        private static void BuildStartPlatform(Transform parent)
         {
-            float len = 20f;
-            var plat = BuilderUtils.CreateBox("StartPlatform", parent, new Vector3(0f, 0f, startZ - len * 0.5f), new Vector3(14f, 1f, len), Hue(0));
+            var plat = BuilderUtils.CreateBox("StartPlatform", parent, new Vector3(0f, 0f, -10f), new Vector3(14f, 1f, 20f), Hue(0));
             BuilderUtils.MarkGround(plat);
-            return startZ - len;
         }
 
-        private static float BuildSpinningBarSection(Transform parent, float startZ)
+        // BarSection floor: center Z=-35, size (14,1,30) -> spans -20..-50.
+        private static void BuildBarSection(Transform parent)
         {
-            float len = 30f;
-            var floor = BuilderUtils.CreateBox("Section1_Floor", parent, new Vector3(0f, 0f, startZ - len * 0.5f), new Vector3(12f, 1f, len), Hue(1));
+            var floor = BuilderUtils.CreateBox("Section1_Floor", parent, new Vector3(0f, 0f, -35f), new Vector3(14f, 1f, 30f), Hue(1));
             BuilderUtils.MarkGround(floor);
 
-            for (int i = 0; i < 2; i++)
+            float[] zs = { -30f, -42f };
+            for (int i = 0; i < zs.Length; i++)
             {
-                float z = startZ - 8f - i * 12f;
-                var post = BuilderUtils.CreateBox($"BarPost_{i}", parent, new Vector3(0f, 1.5f, z), new Vector3(0.4f, 2f, 0.4f), Color.gray);
+                float z = zs[i];
+                BuilderUtils.CreateBox($"BarPost_{i}", parent, new Vector3(0f, 1.5f, z), new Vector3(0.4f, 2f, 0.4f), Color.gray);
                 var barRoot = new GameObject($"SpinningBar_{i}");
                 barRoot.transform.SetParent(parent, false);
                 barRoot.transform.position = new Vector3(0f, 1.5f, z);
@@ -82,24 +86,18 @@ namespace StumbleClone.EditorTools
                 bar.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
                 bar.AddComponent<SpinningBarChild>();
             }
-
-            // Gap with killzone underneath comes naturally from WorldKillZone at Y=-25.
-            float gapStart = startZ - len;
-            var gapMarker = new GameObject("Section1_GapMarker");
-            gapMarker.transform.SetParent(parent, false);
-            gapMarker.transform.position = new Vector3(0f, 0f, gapStart - 3f);
-            return gapStart - 6f; // 6m gap to jump
         }
 
-        private static float BuildHammerSection(Transform parent, float startZ)
+        // HammerSection floor: center Z=-68, size (14,1,36) -> spans -50..-86.
+        private static void BuildHammerSection(Transform parent)
         {
-            float len = 36f;
-            var floor = BuilderUtils.CreateBox("Section2_Floor", parent, new Vector3(0f, 0f, startZ - len * 0.5f), new Vector3(12f, 1f, len), Hue(2));
+            var floor = BuilderUtils.CreateBox("Section2_Floor", parent, new Vector3(0f, 0f, -68f), new Vector3(14f, 1f, 36f), Hue(2));
             BuilderUtils.MarkGround(floor);
 
-            for (int i = 0; i < 3; i++)
+            float[] zs = { -58f, -68f, -78f };
+            for (int i = 0; i < zs.Length; i++)
             {
-                float z = startZ - 8f - i * 10f;
+                float z = zs[i];
                 var pivot = new GameObject($"SwingingHammer_{i}");
                 pivot.transform.SetParent(parent, false);
                 pivot.transform.position = new Vector3(0f, 6f, z);
@@ -110,61 +108,70 @@ namespace StumbleClone.EditorTools
                 var head = BuilderUtils.CreatePrimitive(PrimitiveType.Cube, "Head", pivot.transform, new Vector3(0f, -5.5f, 0f), new Vector3(2.5f, 1.5f, 2.5f), Hue(2));
                 head.AddComponent<SwingingHammerChild>();
             }
-            return startZ - len;
         }
 
-        private static float BuildMovingPlatformSection(Transform parent, float startZ)
+        // RamSection floor (replaces the old floorless moving-platform pit):
+        // center Z=-103, size (14,1,34) -> spans -86..-120. Solid floor so bots can path it.
+        // 3 SlidingRam hazards shove racers toward the side edges; alternating push side +
+        // staggered Z forces the player to weave. SlidingRam.Configure is never called here
+        // (that's an arena-spawner hook), so _travelDir stays zero and the ram does NOT self-move
+        // or self-rotate. We orient transform.forward toward a side edge; on contact the base
+        // ArenaObstacle.TryPush falls back to transform.forward, giving the sideways shove.
+        private static void BuildRamSection(Transform parent)
         {
-            float len = 30f;
-            // No floor here — racers must use moving platforms over a kill drop.
-            for (int i = 0; i < 3; i++)
+            var floor = BuilderUtils.CreateBox("Section3_Floor", parent, new Vector3(0f, 0f, -103f), new Vector3(14f, 1f, 34f), Hue(3));
+            BuilderUtils.MarkGround(floor);
+
+            float[] zs = { -92f, -103f, -114f };
+            for (int i = 0; i < zs.Length; i++)
             {
-                float z = startZ - 6f - i * 9f;
-                var a = new GameObject($"MP_PointA_{i}").transform;
-                a.SetParent(parent, false);
-                a.position = new Vector3(-5f, 0.5f, z);
-                var b = new GameObject($"MP_PointB_{i}").transform;
-                b.SetParent(parent, false);
-                b.position = new Vector3(5f, 0.5f, z);
+                float z = zs[i];
+                // Alternate which side the ram starts on and which way it shoves.
+                bool fromLeft = (i % 2) == 0;
+                float startX = fromLeft ? -5f : 5f;
+                Vector3 pushDir = fromLeft ? Vector3.right : Vector3.left; // toward the opposite side edge
 
-                var plat = BuilderUtils.CreatePrimitive(PrimitiveType.Cube, $"MovingPlatform_{i}", parent, new Vector3(0f, 0.5f, z), new Vector3(4f, 0.4f, 4f), Hue(3));
-                BuilderUtils.MarkGround(plat);
-                var mp = plat.AddComponent<MovingPlatform>();
-                BuilderUtils.SetPrivate(mp, "pointA", a);
-                BuilderUtils.SetPrivate(mp, "pointB", b);
-                BuilderUtils.SetPrivate(mp, "speed", 0.8f + i * 0.15f);
-                BuilderUtils.SetPrivate(mp, "phaseOffset", i * 1.1f);
+                var ram = new GameObject($"SlidingRam_{i}");
+                ram.transform.SetParent(parent, false);
+                ram.transform.position = new Vector3(startX, 1f, z);
+                ram.transform.rotation = Quaternion.LookRotation(pushDir, Vector3.up);
 
-                // Trigger volume above the platform handles parenting.
-                var trig = new GameObject("ParentTrigger");
-                trig.transform.SetParent(plat.transform, false);
-                trig.transform.localPosition = new Vector3(0f, 1f, 0f);
-                var box = trig.AddComponent<BoxCollider>();
-                box.isTrigger = true;
-                box.size = new Vector3(4f, 1.6f, 4f);
-                var relay = trig.AddComponent<MovingPlatformTriggerRelay>();
-                relay.target = mp;
+                var slide = ram.AddComponent<SlidingRam>();
+                // Race track is continuous and persistent: keep the ram alive for the whole run
+                // and give it a strong, snappy sideways shove. (No travel points exist on this
+                // component — it self-computes from arenaCenter only when an arena spawner calls
+                // Configure, which never happens on the Race track.)
+                BuilderUtils.SetPrivate(slide, "lifetime", 9999f);
+                BuilderUtils.SetPrivate(slide, "pushForce", 14f + i * 2f); // phase/intensity stagger
+                BuilderUtils.SetPrivate(slide, "pushCooldown", 0.2f);
+
+                var body = BuilderUtils.CreatePrimitive(PrimitiveType.Cube, "RamBody", ram.transform, Vector3.zero, new Vector3(2.5f, 2f, 2.5f), Hue(3));
+                // The visible cube must not carry its own collider — the ram's BoxCollider on the
+                // root does the pushing; a child collider would block the runner instead of shoving.
+                var childCol = body.GetComponent<Collider>();
+                if (childCol != null) UnityEngine.Object.DestroyImmediate(childCol);
             }
-            return startZ - len;
         }
 
-        private static float BuildFinishPlatform(Transform parent, float startZ)
+        // FinishPlatform: center Z=-134, size (14,1,28) -> spans -120..-148.
+        // Finish line ON the floor at Z=-146 (over the FinishPlatform), reachable by a runner.
+        // Returns the finish GameObject's transform so BotSpawner can target it.
+        private static Transform BuildFinishPlatform(Transform parent)
         {
-            float len = 20f;
-            var plat = BuilderUtils.CreateBox("FinishPlatform", parent, new Vector3(0f, 0f, startZ - len * 0.5f), new Vector3(14f, 1f, len), Hue(4));
+            var plat = BuilderUtils.CreateBox("FinishPlatform", parent, new Vector3(0f, 0f, -134f), new Vector3(14f, 1f, 28f), Hue(4));
             BuilderUtils.MarkGround(plat);
 
-            float finishZ = startZ - 50f;
-            var finishVisual = BuilderUtils.CreateBox("FinishVisual", parent, new Vector3(0f, 2.5f, finishZ), new Vector3(14f, 5f, 0.3f), Color.yellow);
-            var fl = finishVisual.AddComponent<FinishLine>();
+            var finishVisual = BuilderUtils.CreateBox("FinishVisual", parent, new Vector3(0f, 2.5f, -146f), new Vector3(14f, 5f, 0.3f), Color.yellow);
             var col = finishVisual.GetComponent<Collider>();
             if (col != null) col.isTrigger = true;
+            finishVisual.AddComponent<FinishLine>();
             finishVisual.tag = GameConstants.TagFinish;
-            return finishZ;
+            return finishVisual.transform;
         }
 
         private static void BuildWorldKillZone(Transform parent)
         {
+            // Falling off the SIDE of the 14-wide track drops racers into this big trigger.
             var go = BuilderUtils.CreatePrimitive(PrimitiveType.Cube, "WorldKillZone", parent, new Vector3(0f, -20f, -100f), new Vector3(400f, 1f, 600f), new Color(0.6f, 0.1f, 0.1f, 0.4f));
             var col = go.GetComponent<Collider>();
             if (col != null) col.isTrigger = true;
@@ -200,17 +207,21 @@ namespace StumbleClone.EditorTools
                 var sp = new GameObject($"Spawn_{i}");
                 sp.transform.SetParent(group.transform, false);
                 sp.transform.position = center + new Vector3((col - 1.5f) * 2.5f, 0f, -row * 2.5f);
+                // Orient toward the finish: -Z is "forward" down the track.
+                sp.transform.rotation = Quaternion.LookRotation(Vector3.back, Vector3.up);
                 sp.tag = GameConstants.TagRespawnPoint;
             }
         }
 
-        private static void BuildBotSpawner(Transform parent)
+        private static void BuildBotSpawner(Transform parent, Transform finishTransform)
         {
             BuilderUtils.AttachByName(parent, "BotSpawner", "StumbleClone.Bots.BotSpawner", configure: comp =>
             {
                 BuilderUtils.SetPrivate(comp, "mode", LevelMode.Race);
                 BuilderUtils.SetPrivate(comp, "botCount", GameConstants.DefaultBotsPerLevel);
                 BuilderUtils.SetPrivate(comp, "spawnPointOffset", 1); // player owns spawn point 0
+                // Wire the bot goal AND recovery anchor (recovery falls back to finishLine).
+                BuilderUtils.SetPrivate(comp, "finishLine", finishTransform);
             });
         }
 

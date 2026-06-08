@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using StumbleClone.Core;
 using StumbleClone.Obstacles;
+using StumbleClone.Visuals;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -309,6 +310,10 @@ namespace StumbleClone.Bots
                 _shieldActive = false;
                 return;
             }
+            // Cosmetic slapstick: a brief limp tumble in the hit direction. Visual-only — runs
+            // independently of the knockback routine and never touches the body/agent/impulse.
+            // Self-bootstrapping so no prefab wiring is needed.
+            (GetComponent<RagdollEffect>() ?? gameObject.AddComponent<RagdollEffect>()).Trigger(force);
             StartCoroutine(KnockbackRoutine(force));
         }
 

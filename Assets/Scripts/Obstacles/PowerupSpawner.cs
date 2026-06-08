@@ -197,12 +197,15 @@ namespace StumbleClone.Obstacles
 
         private static PowerupType RandomType()
         {
-            // Three equally-weighted types.
-            switch (Random.Range(0, 3))
+            // Five equally-weighted types: the three timed/one-use buffs plus the two held items
+            // (Broom / Slipper). Held items are player-only — a bot that grabs one just pops it.
+            switch (Random.Range(0, 5))
             {
                 case 0: return PowerupType.Speed;
                 case 1: return PowerupType.Shield;
-                default: return PowerupType.SuperJump;
+                case 2: return PowerupType.SuperJump;
+                case 3: return PowerupType.Broom;
+                default: return PowerupType.Slipper;
             }
         }
     }

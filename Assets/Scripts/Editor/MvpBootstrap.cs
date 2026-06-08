@@ -530,12 +530,15 @@ namespace StumbleClone.EditorTools
                 }
             }
 
-            // Spawn the Player at the first spawn point.
+            // Spawn the Player at the first spawn point, facing the spawn point's orientation.
             Vector3 playerPos = new Vector3(0f, 2f, 0f);
+            Quaternion playerRot = Quaternion.identity;
             var spawnGroup = FindByName(levelRoot, "SpawnPoints");
             if (spawnGroup != null && spawnGroup.transform.childCount > 0)
             {
-                playerPos = spawnGroup.transform.GetChild(0).position;
+                Transform sp0 = spawnGroup.transform.GetChild(0);
+                playerPos = sp0.position;
+                playerRot = sp0.rotation;
             }
 
             var playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
@@ -544,7 +547,7 @@ namespace StumbleClone.EditorTools
             {
                 playerInstance = (GameObject)PrefabUtility.InstantiatePrefab(playerPrefab);
                 playerInstance.name = "Player";
-                playerInstance.transform.position = playerPos;
+                playerInstance.transform.SetPositionAndRotation(playerPos, playerRot);
             }
 
             // Set up the Main Camera with ThirdPersonCamera.
@@ -574,6 +577,20 @@ namespace StumbleClone.EditorTools
             // Save the scene.
             EnsureFolder("Assets/Scenes");
             EditorSceneManager.SaveScene(scene, scenePath);
+        }
+
+        /// Headless entry point that rebuilds ONLY the Race scene against the existing
+        /// Player/Bot prefabs (it does NOT rebuild prefabs or the other level scenes).
+        /// Use this to materialize Race-builder changes — e.g. spawns now oriented toward
+        /// the finish so the baked player spawns facing it.
+        ///
+        /// Headless (GUI closed):
+        ///   Unity.exe -batchmode -projectPath "&lt;win&gt;" \
+        ///     -executeMethod StumbleClone.EditorTools.MvpBootstrap.RebuildRaceSceneHeadless -logFile &lt;log&gt;
+        public static void RebuildRaceSceneHeadless()
+        {
+            BuildLevelScene(LevelMode.Race, RaceScenePath, RaceLevelBuilder.Build, "RaceLevel");
+            Debug.Log("[MvpBootstrap] Race scene rebuilt headlessly: " + RaceScenePath);
         }
 
         // =======================================================================

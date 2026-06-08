@@ -39,6 +39,8 @@ namespace StumbleClone.UI
         private Badge _shield;
         private Badge _speed;
         private Badge _jump;
+        private Badge _broom;   // held item: shows remaining swings
+        private Badge _slipper; // held item: shows remaining throws (1)
 
         // ---- self-bootstrap (zero scene wiring) ---------------------------------
 
@@ -90,6 +92,8 @@ namespace StumbleClone.UI
                 _shield.SetActive(false);
                 _speed.SetActive(false);
                 _jump.SetActive(false);
+                _broom.SetActive(false);
+                _slipper.SetActive(false);
                 return;
             }
 
@@ -99,6 +103,7 @@ namespace StumbleClone.UI
             UpdateTimed(_speed, speedLeft, SpeedDuration);
             UpdateTimed(_jump, jumpLeft, JumpDuration);
             UpdateShield(_shield, player.ShieldActive);
+            UpdateHeldItems(player);
 
             // Re-stack so visible badges sit flush with no gaps left by a hidden one.
             Restack();
@@ -123,6 +128,24 @@ namespace StumbleClone.UI
             // Shield has no timer — its readout stays its letter and the bar holds full.
         }
 
+        // Held items (broom/slipper) have no timer — they show their letter plus the remaining-uses
+        // count. Only the currently-held item's badge is visible (one item at a time).
+        private void UpdateHeldItems(PlayerController player)
+        {
+            var held = player.GetComponent<HeldItem>();
+            HeldItem.ItemKind kind = held != null ? held.Current : HeldItem.ItemKind.None;
+            int uses = held != null ? held.RemainingUses : 0;
+
+            bool broomOn = kind == HeldItem.ItemKind.Broom;
+            bool slipperOn = kind == HeldItem.ItemKind.Slipper;
+
+            _broom.SetActive(broomOn);
+            if (broomOn) _broom.SetCount(uses);
+
+            _slipper.SetActive(slipperOn);
+            if (slipperOn) _slipper.SetCount(uses);
+        }
+
         // Position each visible badge top-down so hidden buffs leave no gap.
         private void Restack()
         {
@@ -130,6 +153,8 @@ namespace StumbleClone.UI
             y = Place(_shield, y);
             y = Place(_speed, y);
             y = Place(_jump, y);
+            y = Place(_broom, y);
+            y = Place(_slipper, y);
         }
 
         private static float Place(Badge badge, float y)
@@ -149,10 +174,15 @@ namespace StumbleClone.UI
             _shield = CreateBadge("ShieldBadge", "S", new Color(0.15f, 0.85f, 1f), timed: false);
             _speed = CreateBadge("SpeedBadge", "SPD", new Color(1f, 0.92f, 0.15f), timed: true);
             _jump = CreateBadge("JumpBadge", "JMP", new Color(1f, 0.2f, 0.9f), timed: true);
+            // Held items (untimed; show remaining-uses count next to their letter).
+            _broom = CreateBadge("BroomBadge", "BROOM", new Color(0.78f, 0.55f, 0.25f), timed: false);
+            _slipper = CreateBadge("SlipperBadge", "SLIPPER", new Color(1f, 0.35f, 0.4f), timed: false);
 
             _shield.SetActive(false);
             _speed.SetActive(false);
             _jump.SetActive(false);
+            _broom.SetActive(false);
+            _slipper.SetActive(false);
         }
 
         // Build one badge: a rounded panel anchored to the top-right, a bold label, and (for timed
@@ -236,6 +266,13 @@ namespace StumbleClone.UI
                 if (_label == null) return;
                 int s = Mathf.Max(1, Mathf.CeilToInt(seconds));
                 _label.text = _letter + " " + s.ToString();
+            }
+
+            // Show a remaining-uses count next to the letter (held items: broom swings / slipper throws).
+            public void SetCount(int count)
+            {
+                if (_label == null) return;
+                _label.text = _letter + " x" + Mathf.Max(0, count).ToString();
             }
         }
     }
